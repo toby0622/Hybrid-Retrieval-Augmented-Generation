@@ -143,7 +143,7 @@ export function KnowledgeInterface({ addToast }: KnowledgeInterfaceProps) {
             </CardContent>
           </Card>
         ) : (
-          <div className="flex flex-col gap-4 pb-8 max-w-4xl">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 pb-8">
             {tasks.map(task => (
               <EntityCard key={task.id} task={task} onResolve={handleResolve} />
             ))}
