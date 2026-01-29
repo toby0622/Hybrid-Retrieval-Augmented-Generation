@@ -119,8 +119,8 @@ async def input_guard_node(state: GraphState) -> GraphState:
             slots = SlotInfo(**{k: v for k, v in slot_data.items() if v is not None})
             
         except Exception as e:
-            # Basic extraction fallback
-            slots = SlotInfo(additional_context=query)
+            # Enhanced fallback extraction with regex/keyword matching
+            slots = _extract_slots_fallback(query)
     
     return {
         **state,
@@ -128,6 +128,64 @@ async def input_guard_node(state: GraphState) -> GraphState:
         "slots": slots,
         "clarification_count": state.get("clarification_count", 0)
     }
+
+
+def _extract_slots_fallback(query: str) -> SlotInfo:
+    """Fallback slot extraction when LLM is unavailable."""
+    import re
+    
+    lower_query = query.lower()
+    
+    # Known service names (add more as needed)
+    known_services = [
+        "PaymentService", "OrderService", "UserService", 
+        "NotificationService", "InventoryService",
+        "payment-service", "order-service", "user-service",
+        "payment", "order", "user", "inventory", "notification",
+        "api", "gateway", "auth", "database", "redis", "kafka"
+    ]
+    
+    service_name = None
+    for svc in known_services:
+        if svc.lower() in lower_query:
+            service_name = svc
+            break
+    
+    # Error types
+    error_type = None
+    error_keywords = {
+        "timeout": "timeout",
+        "latency": "latency",
+        "slow": "latency", 
+        "crash": "crash",
+        "down": "down",
+        "error": "error",
+        "fail": "failure",
+        "connection": "connection",
+        "pool": "connection_pool",
+        "memory": "memory",
+        "cpu": "cpu"
+    }
+    for kw, etype in error_keywords.items():
+        if kw in lower_query:
+            error_type = etype
+            break
+    
+    # Environment
+    environment = None
+    if "prod" in lower_query:
+        environment = "prod"
+    elif "staging" in lower_query:
+        environment = "staging"
+    elif "dev" in lower_query:
+        environment = "dev"
+    
+    return SlotInfo(
+        service_name=service_name,
+        error_type=error_type,
+        environment=environment,
+        additional_context=query
+    )
 
 
 def route_after_guard(state: GraphState) -> str:

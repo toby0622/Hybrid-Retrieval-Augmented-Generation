@@ -11,9 +11,10 @@ class Settings(BaseSettings):
     """Application settings loaded from environment variables"""
     
     # LLM Configuration (LM Studio compatible)
-    llm_base_url: str = "http://localhost:1234/v1"
+    llm_base_url: str = "http://localhost:8192/v1"
     llm_api_key: str = "lm-studio"
-    llm_model_name: str = "local-model"
+    llm_model_name: str = "google/gemma-3-27b"
+    embedding_model_name: str = "text-embedding-embeddinggemma-300m"
     
     # Neo4j Configuration
     neo4j_uri: str = "bolt://localhost:7687"

@@ -41,7 +41,7 @@ export interface DiagnosticResponse {
 export interface ReasoningStep {
   id: string;
   label: string;
-  status: 'pending' | 'completed';
+  status: 'pending' | 'active' | 'completed';
 }
 
 export interface ChatResponse {

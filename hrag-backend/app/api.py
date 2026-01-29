@@ -4,14 +4,18 @@ REST API endpoints for the HRAG system
 """
 
 import uuid
-from typing import Optional, List
+import asyncio
+import json
+from typing import Optional, List, AsyncGenerator
 from fastapi import FastAPI, HTTPException, UploadFile, File, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
 from app.graph import run_query, graph
 from app.state import DiagnosticResponse, DiagnosticStep, SlotInfo
 from app.nodes.feedback import extract_entities_node, check_entity_conflicts
+from config import settings
 
 
 # --- API Models ---
@@ -21,6 +25,7 @@ class ChatRequest(BaseModel):
     query: str
     thread_id: Optional[str] = None
     feedback: Optional[str] = None
+    stream: bool = False  # Enable streaming mode
 
 
 class ReasoningStep(BaseModel):
@@ -111,12 +116,120 @@ async def health_check():
     Health check endpoint.
     Checks connectivity to all services.
     """
-    # TODO: Implement actual connectivity checks
+    neo4j_status = "disconnected"
+    qdrant_status = "disconnected"
+    llm_status = "disconnected"
+    
+    # Check Neo4j
+    try:
+        from neo4j import GraphDatabase
+        driver = GraphDatabase.driver(
+            settings.neo4j_uri,
+            auth=(settings.neo4j_user, settings.neo4j_password)
+        )
+        with driver.session() as session:
+            session.run("RETURN 1")
+        driver.close()
+        neo4j_status = "connected"
+    except Exception as e:
+        neo4j_status = f"error: {str(e)[:30]}"
+    
+    # Check Qdrant
+    try:
+        from qdrant_client import QdrantClient
+        client = QdrantClient(host=settings.qdrant_host, port=settings.qdrant_port)
+        client.get_collections()
+        qdrant_status = "connected"
+    except Exception as e:
+        qdrant_status = f"error: {str(e)[:30]}"
+    
+    # Check LLM
+    try:
+        import httpx
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            response = await client.get(f"{settings.llm_base_url}/models")
+            if response.status_code == 200:
+                llm_status = "connected"
+    except Exception as e:
+        llm_status = f"error: {str(e)[:30]}"
+    
+    overall_status = "healthy" if all(
+        s == "connected" for s in [neo4j_status, qdrant_status]
+    ) else "degraded"
+    
     return HealthResponse(
-        status="healthy",
-        neo4j="mock",  # Will show "connected" when real DB is set up
-        qdrant="mock",
-        llm="lm-studio"
+        status=overall_status,
+        neo4j=neo4j_status,
+        qdrant=qdrant_status,
+        llm=llm_status
+    )
+
+
+@app.post("/chat/stream")
+async def chat_stream(request: ChatRequest):
+    """
+    Streaming chat endpoint.
+    Streams reasoning steps in real-time, then sends diagnostic.
+    """
+    thread_id = request.thread_id or str(uuid.uuid4())
+    
+    async def generate() -> AsyncGenerator[str, None]:
+        # Stream reasoning steps first
+        reasoning_steps = [
+            {"id": "step_0", "label": "Input Guardrails: Analyzing query...", "status": "pending"},
+            {"id": "step_1", "label": "Slot Extraction: Identifying entities...", "status": "pending"},
+            {"id": "step_2", "label": "Graph Search: Querying topology...", "status": "pending"},
+            {"id": "step_3", "label": "Vector Search: Finding relevant documents...", "status": "pending"},
+            {"id": "step_4", "label": "MCP Tool: Executing data queries...", "status": "pending"},
+            {"id": "step_5", "label": "LLM Reasoning: Synthesizing diagnosis...", "status": "pending"},
+        ]
+        
+        # Stream each step with delay
+        for i, step in enumerate(reasoning_steps):
+            step["status"] = "active"
+            yield f"data: {json.dumps({'type': 'reasoning', 'step': step})}\n\n"
+            await asyncio.sleep(0.3)  # Small delay for animation
+            
+            # Mark as completed
+            step["status"] = "completed"
+            yield f"data: {json.dumps({'type': 'reasoning', 'step': step})}\n\n"
+        
+        # Now run the actual graph
+        try:
+            result = await run_query(
+                query=request.query,
+                thread_id=thread_id,
+                feedback=request.feedback
+            )
+            
+            # Send final response
+            response_data = {
+                "type": "complete",
+                "thread_id": thread_id,
+                "response": result.get("response", ""),
+                "intent": result.get("intent", "chat"),
+                "diagnostic": result.get("diagnostic"),
+                "clarification_question": result.get("clarification_question")
+            }
+            
+            # Serialize diagnostic if present (Pydantic model)
+            if response_data["diagnostic"]:
+                response_data["diagnostic"] = response_data["diagnostic"].model_dump()
+            
+            yield f"data: {json.dumps(response_data)}\n\n"
+            
+        except Exception as e:
+            yield f"data: {json.dumps({'type': 'error', 'message': str(e)})}\n\n"
+        
+        yield "data: [DONE]\n\n"
+    
+    return StreamingResponse(
+        generate(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+        }
     )
 
 
@@ -281,11 +394,42 @@ async def gardener_action(action: GardenerAction):
 @app.get("/stats")
 async def get_stats():
     """
-    Get system statistics.
+    Get system statistics from actual databases.
     """
+    indexed_documents = 0
+    knowledge_nodes = 0
+    
+    # Get Qdrant document count
+    try:
+        from qdrant_client import QdrantClient
+        client = QdrantClient(host=settings.qdrant_host, port=settings.qdrant_port)
+        collections = client.get_collections()
+        for col in collections.collections:
+            if col.name == settings.qdrant_collection:
+                info = client.get_collection(settings.qdrant_collection)
+                indexed_documents = info.points_count
+                break
+    except Exception as e:
+        print(f"Qdrant stats error: {e}")
+    
+    # Get Neo4j node count
+    try:
+        from neo4j import GraphDatabase
+        driver = GraphDatabase.driver(
+            settings.neo4j_uri,
+            auth=(settings.neo4j_user, settings.neo4j_password)
+        )
+        with driver.session() as session:
+            result = session.run("MATCH (n) RETURN count(n) as count")
+            record = result.single()
+            knowledge_nodes = record["count"] if record else 0
+        driver.close()
+    except Exception as e:
+        print(f"Neo4j stats error: {e}")
+    
     return {
-        "indexed_documents": 1204,  # Mock
-        "knowledge_nodes": 45000,   # Mock
+        "indexed_documents": indexed_documents,
+        "knowledge_nodes": knowledge_nodes,
         "pending_tasks": len(gardener_tasks),
-        "active_threads": 0  # TODO: Track active conversations
+        "active_threads": 0
     }

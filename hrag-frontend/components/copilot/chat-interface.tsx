@@ -1,19 +1,20 @@
 "use client";
 
-import { useState, useRef, useEffect } from 'react';
-import { Cpu, Database, ChevronRight } from 'lucide-react';
+import { useState, useRef, useEffect, useCallback } from 'react';
+import { Cpu, Database, ChevronRight, Loader2, AlertCircle } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { DynamicReasoning } from './dynamic-reasoning';
 import { DiagnosticCard } from './diagnostic-card';
-import { Message, DiagnosticStep, ReasoningStep } from '@/types';
+import { Message, ReasoningStep } from '@/types';
+import { apiClient, StreamEvent } from '@/lib/api';
 
 // Initial system message
 const INITIAL_MESSAGES: Message[] = [
   {
     id: 1,
     role: 'system',
-    content: 'DevOps Copilot Online. Connected to Neo4j (Graph) and Qdrant (Vector). Ready for queries.',
+    content: 'DevOps Copilot Online. Connecting to backend services...',
     timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
   }
 ];
@@ -26,21 +27,68 @@ export function ChatInterface({ addToast }: ChatInterfaceProps) {
   const [input, setInput] = useState('');
   const [messages, setMessages] = useState<Message[]>(INITIAL_MESSAGES);
   const [isLoading, setIsLoading] = useState(false);
+  const [threadId, setThreadId] = useState<string | null>(null);
+  const [isConnected, setIsConnected] = useState<boolean | null>(null);
+  const [healthInfo, setHealthInfo] = useState<{neo4j: string, qdrant: string, llm: string} | null>(null);
+  
+  // Track current streaming reasoning steps
+  const [streamingSteps, setStreamingSteps] = useState<ReasoningStep[]>([]);
+  const [isStreaming, setIsStreaming] = useState(false);
+  
   const messagesEndRef = useRef<HTMLDivElement>(null);
   
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
+  }, [messages, streamingSteps]);
 
-  const handleDiagnosticAction = (actionType: 'case_study' | 'resolve') => {
+  // Check backend health on mount
+  useEffect(() => {
+    const checkHealth = async () => {
+      try {
+        const health = await apiClient.health();
+        const isHealthy = health.status === 'healthy' || health.status === 'degraded';
+        setIsConnected(isHealthy);
+        setHealthInfo({ neo4j: health.neo4j, qdrant: health.qdrant, llm: health.llm });
+        setMessages([{
+          id: 1,
+          role: 'system',
+          content: `DevOps Copilot Online. Neo4j: ${health.neo4j} | Qdrant: ${health.qdrant} | LLM: ${health.llm}`,
+          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        }]);
+      } catch (error) {
+        setIsConnected(false);
+        setMessages([{
+          id: 1,
+          role: 'system',
+          content: 'Backend connection failed. Please ensure the API server is running on localhost:8000',
+          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        }]);
+      }
+    };
+    checkHealth();
+  }, []);
+
+  const handleDiagnosticAction = async (actionType: 'case_study' | 'resolve') => {
     if (actionType === 'case_study') {
       addToast('Generated new Case Study draft from incident analysis.', 'success');
     } else if (actionType === 'resolve') {
+      // Send feedback to backend
+      if (threadId) {
+        try {
+          await apiClient.chat({
+            query: 'Issue resolved',
+            thread_id: threadId,
+            feedback: 'resolved'
+          });
+        } catch (error) {
+          console.error('Feedback error:', error);
+        }
+      }
       addToast('Incident marked resolved. Feedback loop updated.', 'success');
     }
   };
 
-  const handleSendMessage = async () => {
+  const handleSendMessage = useCallback(async () => {
     if (!input.trim() || isLoading) return;
 
     const userMsg: Message = {
@@ -51,118 +99,88 @@ export function ChatInterface({ addToast }: ChatInterfaceProps) {
     };
     
     setMessages(prev => [...prev, userMsg]);
+    const currentInput = input;
     setInput('');
     setIsLoading(true);
+    setIsStreaming(true);
+    setStreamingSteps([]);
 
-    const lowerInput = input.toLowerCase();
-    
-    // Simulate API call with demo responses
-    setTimeout(() => {
-      // Path 1: Greeting/Help
-      if (lowerInput.match(/^(hi|hello|hey|help|who are you)/)) {
-        setMessages(prev => [...prev, {
-          id: Date.now(),
-          role: 'assistant',
-          content: 'Hello! I am your DevOps Copilot. I can help investigate incidents, analyze logs, and query the Knowledge Graph. Please provide specific error logs or incident details to start.',
-          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-        }]);
-        setIsLoading(false);
-        return;
+    // Handler for each reasoning step
+    const handleStep = (step: ReasoningStep) => {
+      setStreamingSteps(prev => {
+        const existing = prev.find(s => s.id === step.id);
+        if (existing) {
+          return prev.map(s => s.id === step.id ? step : s);
+        }
+        return [...prev, step];
+      });
+    };
+
+    // Handler for complete response
+    const handleComplete = (event: StreamEvent) => {
+      setIsStreaming(false);
+      setStreamingSteps([]);
+      
+      if (event.thread_id) {
+        setThreadId(event.thread_id);
       }
 
-      // Path 2: Incident Diagnosis Demo
-      if (lowerInput.includes('latency') || lowerInput.includes('payment') || lowerInput.includes('slow') || lowerInput.includes('error') || lowerInput.includes('timeout')) {
-        // First add reasoning message
-        const reasoningSteps: ReasoningStep[] = [
-          { id: 'step1', label: 'Input Guardrails: Incident Query detected.', status: 'completed' },
-          { id: 'step2', label: 'Slot Filling: Context implies "prod-cluster-alpha".', status: 'completed' },
-          { id: 'step3', label: 'Hybrid Retrieval: Neo4j (Topology) + Qdrant (Docs).', status: 'completed' },
-          { id: 'step4', label: 'MCP Tool: Executed SQL query on `metrics_db`.', status: 'completed' },
-        ];
-        
-        const reasoningMsg: Message = {
+      // Add final message based on response type
+      if (event.diagnostic) {
+        const diagnosticMsg: Message = {
           id: Date.now() + 1,
           role: 'assistant',
-          type: 'reasoning',
-          reasoning_steps: reasoningSteps,
-          content: 'Analysis in progress...',
+          type: 'diagnostic',
+          content: event.response || '',
+          diagnostic: event.diagnostic,
           timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
         };
-        setMessages(prev => [...prev, reasoningMsg]);
-
-        // Then add diagnostic after delay
-        setTimeout(() => {
-          const diagnosticPath: DiagnosticStep[] = [
-            { 
-              id: 'p1',
-              source: 'Log Analysis', 
-              title: 'Trigger: Connection Pool Exhausted',
-              detail: 'Error: Connection Pool Exhausted in Payment-Service', 
-              status: 'error',
-              is_root: true,
-              raw_content: {
-                type: 'log',
-                data: '[2025-11-25 09:30:01.241] ERROR [PaymentService] HikariPool-1 - Connection is not available...'
-              }
-            },
-            { 
-              id: 'p2',
-              source: 'Graph Topology', 
-              title: 'Context: Deployment',
-              detail: 'v2.4.1-hotfix deployed @ 09:15', 
-              status: 'warning',
-              is_parallel: true,
-              raw_content: {
-                type: 'graph',
-                data: {
-                  node: 'PaymentService',
-                  relationship: 'DEPLOYED_ON',
-                  properties: { version: 'v2.4.1-hotfix' }
-                }
-              }
-            },
-            { 
-              id: 'p3',
-              source: 'Vector Search', 
-              title: 'Context: Post-Mortem',
-              detail: 'Ref: Post-Mortem #402 (HikariCP)', 
-              status: 'info',
-              is_parallel: true,
-              raw_content: {
-                type: 'markdown',
-                data: '**Post-Mortem #402 Summary**\nRoot Cause: HikariCP pool size reset.'
-              }
-            }
-          ];
-
-          const diagnosticMsg: Message = {
-            id: Date.now() + 2,
-            role: 'assistant',
-            type: 'diagnostic',
-            content: '根據混合檢索與日誌分析，發現潛在根因。',
-            diagnostic: {
-              path: diagnosticPath,
-              suggestion: '建議檢查 `Payment-Service` 的 HikariCP 設定。新版本部署可能重置了 `maximum-pool-size` 參數。',
-              confidence: 0.87
-            },
-            timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-          };
-          setMessages(prev => [...prev, diagnosticMsg]);
-          setIsLoading(false);
-        }, 2000);
-        return;
+        setMessages(prev => [...prev, diagnosticMsg]);
+      } else if (event.clarification_question) {
+        const clarificationMsg: Message = {
+          id: Date.now() + 1,
+          role: 'assistant',
+          content: event.clarification_question,
+          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        };
+        setMessages(prev => [...prev, clarificationMsg]);
+      } else {
+        const textMsg: Message = {
+          id: Date.now() + 1,
+          role: 'assistant',
+          content: event.response || 'No response received.',
+          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        };
+        setMessages(prev => [...prev, textMsg]);
       }
-
-      // Path 3: Fallback
-      setMessages(prev => [...prev, {
-        id: Date.now(),
-        role: 'assistant',
-        content: 'I did not recognize a specific incident pattern. Could you provide more details, such as error logs, service names, or timestamps?',
-        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-      }]);
+      
       setIsLoading(false);
-    }, 800);
-  };
+    };
+
+    // Handler for errors
+    const handleError = (error: string) => {
+      setIsStreaming(false);
+      setStreamingSteps([]);
+      
+      const errorMsg: Message = {
+        id: Date.now() + 1,
+        role: 'assistant',
+        content: `Connection error: ${error}. Please check if the backend is running.`,
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      };
+      setMessages(prev => [...prev, errorMsg]);
+      addToast('Failed to connect to backend API', 'error');
+      setIsLoading(false);
+    };
+
+    // Use streaming API
+    await apiClient.chatStream(
+      { query: currentInput, thread_id: threadId || undefined },
+      handleStep,
+      handleComplete,
+      handleError
+    );
+  }, [input, isLoading, threadId, addToast]);
 
   return (
     <div className="flex flex-col h-full bg-slate-950 relative overflow-hidden">
@@ -171,15 +189,25 @@ export function ChatInterface({ addToast }: ChatInterfaceProps) {
         <div>
           <h2 className="text-lg font-bold text-slate-100 flex items-center gap-2">
             Incident Response Copilot
-            <span className="text-xs font-normal px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-              System Healthy
-            </span>
+            {isConnected === null ? (
+              <span className="text-xs font-normal px-2 py-0.5 rounded-full bg-slate-500/10 text-slate-400 border border-slate-500/20">
+                <Loader2 className="w-3 h-3 inline animate-spin mr-1" /> Connecting...
+              </span>
+            ) : isConnected ? (
+              <span className="text-xs font-normal px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                Connected
+              </span>
+            ) : (
+              <span className="text-xs font-normal px-2 py-0.5 rounded-full bg-red-500/10 text-red-400 border border-red-500/20">
+                <AlertCircle className="w-3 h-3 inline mr-1" /> Disconnected
+              </span>
+            )}
           </h2>
-          <p className="text-xs text-slate-500">Retrieval: Hybrid (Graph + Vector) • Model: LLM-Reasoning-v2</p>
+          <p className="text-xs text-slate-500">Retrieval: Hybrid (Graph + Vector) • Model: gemma-3-27b</p>
         </div>
         <div className="ml-auto flex items-center gap-3">
-          <div className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-900 rounded-md border border-slate-800 text-xs text-slate-400 hover:border-slate-600 transition-colors cursor-help" title="Connection Status: Active">
-            <Database className="w-3 h-3" /> Neo4j Connected
+          <div className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-900 rounded-md border border-slate-800 text-xs text-slate-400 hover:border-slate-600 transition-colors cursor-help" title="Connection Status">
+            <Database className="w-3 h-3" /> API: localhost:8000
           </div>
         </div>
       </div>
@@ -202,9 +230,7 @@ export function ChatInterface({ addToast }: ChatInterfaceProps) {
                 <span className="text-[10px] text-slate-500">{msg.timestamp}</span>
               </div>
 
-              {msg.type === 'reasoning' && msg.reasoning_steps ? (
-                <DynamicReasoning steps={msg.reasoning_steps} />
-              ) : msg.type === 'diagnostic' && msg.diagnostic ? (
+              {msg.type === 'diagnostic' && msg.diagnostic ? (
                 <DiagnosticCard 
                   diagnostic={msg.diagnostic} 
                   onAction={handleDiagnosticAction}
@@ -221,6 +247,23 @@ export function ChatInterface({ addToast }: ChatInterfaceProps) {
             </div>
           </div>
         ))}
+
+        {/* Real-time Streaming Reasoning Steps */}
+        {isStreaming && streamingSteps.length > 0 && (
+          <div className="flex gap-4">
+            <div className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 shadow-lg bg-blue-600 shadow-blue-500/20">
+              <Cpu className="w-4 h-4 text-white" />
+            </div>
+            <div className="flex-1">
+              <div className="flex items-center gap-2 mb-1 opacity-70">
+                <span className="text-xs font-bold text-slate-300">DevOps Copilot</span>
+                <span className="text-[10px] text-slate-500">{new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+              </div>
+              <DynamicReasoning steps={streamingSteps} isStreaming={true} />
+            </div>
+          </div>
+        )}
+
         <div ref={messagesEndRef} />
       </div>
 
@@ -240,7 +283,7 @@ export function ChatInterface({ addToast }: ChatInterfaceProps) {
             disabled={isLoading}
             size="icon"
           >
-            <ChevronRight className="w-4 h-4" />
+            {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <ChevronRight className="w-4 h-4" />}
           </Button>
         </div>
       </div>
