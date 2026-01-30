@@ -74,25 +74,19 @@ async def get_embedding(text: str) -> List[float]:
     """
     Get embedding from LM Studio embedding model.
     Uses the OpenAI-compatible /v1/embeddings endpoint.
+    
+    Raises:
+        RuntimeError: If embedding generation fails.
     """
-    try:
-        async with httpx.AsyncClient(timeout=30.0) as client:
-            response = await client.post(
-                f"{settings.llm_base_url}/embeddings",
-                json={"model": settings.embedding_model_name, "input": text},
-                headers={"Authorization": f"Bearer {settings.llm_api_key}"},
-            )
-            response.raise_for_status()
-            data = response.json()
-            return data["data"][0]["embedding"]
-    except Exception as e:
-        print(f"Embedding error: {e}")
-        # Fallback to hash-based embedding for demo
-        import numpy as np
-
-        np.random.seed(hash(text.lower()) % 10000)
-        embedding = np.random.randn(EMBEDDING_DIM).astype(np.float32)
-        return (embedding / np.linalg.norm(embedding)).tolist()
+    async with httpx.AsyncClient(timeout=30.0) as client:
+        response = await client.post(
+            f"{settings.llm_base_url}/embeddings",
+            json={"model": settings.embedding_model_name, "input": text},
+            headers={"Authorization": f"Bearer {settings.llm_api_key}"},
+        )
+        response.raise_for_status()
+        data = response.json()
+        return data["data"][0]["embedding"]
 
 
 async def graph_search_node(state: GraphState) -> GraphState:
@@ -204,11 +198,7 @@ async def graph_search_node(state: GraphState) -> GraphState:
                         )
 
     except Exception as e:
-        print(f"Graph search error: {e}")
-
-    # Fallback to mock if no results
-    if not results:
-        results = _get_mock_graph_results(slots)
+        raise RuntimeError(f"Graph search failed: {e}") from e
 
     return {**state, "graph_results": results}
 
@@ -218,7 +208,9 @@ async def vector_search_node(state: GraphState) -> GraphState:
     Vector Search Node (Qdrant)
 
     Semantic search over document embeddings.
-    Falls back to mock data if Qdrant is unavailable.
+    
+    Raises:
+        RuntimeError: If vector search fails.
     """
     query = state.get("query", "")
     slots = state.get("slots", SlotInfo())
@@ -274,16 +266,14 @@ async def vector_search_node(state: GraphState) -> GraphState:
                         )
                     )
             else:
-                print(
+                raise RuntimeError(
                     f"Collection '{settings.qdrant_collection}' not found. Run init_db.py first."
                 )
+        else:
+            raise RuntimeError("Qdrant client not available")
 
     except Exception as e:
-        print(f"Vector search error: {e}")
-
-    # Mock data fallback
-    if not results:
-        results = _get_mock_vector_results(slots)
+        raise RuntimeError(f"Vector search failed: {e}") from e
 
     return {**state, "vector_results": results}
 
@@ -308,63 +298,3 @@ async def hybrid_retrieval_node(state: GraphState) -> GraphState:
         "vector_results": vector_state.get("vector_results", []),
     }
 
-
-def _get_mock_graph_results(slots: SlotInfo) -> List[RetrievalResult]:
-    """Generate mock graph results for demonstration"""
-    service = slots.service_name or "PaymentService"
-
-    return [
-        RetrievalResult(
-            source="graph",
-            title=f"{service} Deployment",
-            content=f"v2.4.1-hotfix deployed @ 09:15 UTC",
-            metadata={
-                "node": service,
-                "relationship": "DEPLOYED_ON",
-                "properties": {
-                    "version": "v2.4.1-hotfix",
-                    "timestamp": "2025-01-28T09:15:00Z",
-                },
-            },
-            confidence=0.92,
-            raw_data={
-                "node": service,
-                "relationship": "DEPLOYED_ON",
-                "properties": {"version": "v2.4.1-hotfix"},
-            },
-        ),
-        RetrievalResult(
-            source="graph",
-            title=f"{service} Dependencies",
-            content="Depends on: Redis-Cache, PostgreSQL-Primary",
-            metadata={"dependencies": ["Redis-Cache", "PostgreSQL-Primary"]},
-            confidence=0.88,
-            raw_data={"dependencies": ["Redis-Cache", "PostgreSQL-Primary"]},
-        ),
-    ]
-
-
-def _get_mock_vector_results(slots: SlotInfo) -> List[RetrievalResult]:
-    """Generate mock vector results for demonstration"""
-
-    return [
-        RetrievalResult(
-            source="vector",
-            title="Post-Mortem #402: HikariCP Pool Exhaustion",
-            content="Root Cause: Connection pool size was reset to default (10) after deployment. Under load, this caused connection exhaustion and timeout errors.",
-            metadata={"document_type": "post_mortem", "date": "2025-01-15"},
-            confidence=0.89,
-            raw_data="""**Post-Mortem #402 Summary**
-Root Cause: HikariCP pool size reset during deployment.
-Resolution: Updated config to maintain pool-size=50.
-Prevention: Added config validation in CI/CD pipeline.""",
-        ),
-        RetrievalResult(
-            source="vector",
-            title="SOP: Database Connection Troubleshooting",
-            content="Steps for diagnosing connection issues: 1. Check HikariCP metrics 2. Verify pool size configuration 3. Review recent deployments",
-            metadata={"document_type": "sop", "category": "database"},
-            confidence=0.82,
-            raw_data="Standard Operating Procedure for database connection troubleshooting...",
-        ),
-    ]

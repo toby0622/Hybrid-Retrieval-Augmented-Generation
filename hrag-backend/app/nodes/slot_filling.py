@@ -147,14 +147,6 @@ async def slot_check_node(state: GraphState) -> GraphState:
             }
         )
         clarification = result.content.strip()
-    except Exception as e:
-        # Fallback question
-        if "service_name" in missing:
-            clarification = "Which service or component is experiencing the issue?"
-        elif "error_type" in missing:
-            clarification = "What type of error or symptom are you seeing?"
-        else:
-            clarification = "Could you provide more details about the issue?"
 
     return {
         **state,

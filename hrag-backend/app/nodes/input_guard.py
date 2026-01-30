@@ -209,55 +209,28 @@ async def input_guard_node(state: GraphState) -> GraphState:
         else:
             intent = "chat"
 
-    except Exception as e:
-        # Fallback to simple keyword matching
-        lower_query = query.lower()
-        if any(
-            kw in lower_query
-            for kw in [
-                "error",
-                "slow",
-                "down",
-                "fail",
-                "issue",
-                "problem",
-                "timeout",
-                "crash",
-            ]
-        ):
-            intent = "incident"
-        elif any(kw in lower_query for kw in ["bye", "thanks", "done", "goodbye"]):
-            intent = "end"
-        else:
-            intent = "chat"
-
     # Step 2: For incidents, extract slots
     slots = SlotInfo()
     if intent == "incident":
-        try:
-            extraction_chain = SLOT_EXTRACTION_PROMPT | llm
-            result = await extraction_chain.ainvoke({"query": query})
+        extraction_chain = SLOT_EXTRACTION_PROMPT | llm
+        result = await extraction_chain.ainvoke({"query": query})
 
-            # Parse JSON response
-            import json
+        # Parse JSON response
+        import json
 
-            content = result.content.strip()
-            # Handle prefill: response starts after the prefilled "{"
-            # So we need to prepend "{" to complete the JSON
-            if not content.startswith("{"):
-                content = "{" + content
-            # Handle markdown code blocks (fallback)
-            if "```" in content:
-                content = content.split("```")[1]
-                if content.startswith("json"):
-                    content = content[4:]
+        content = result.content.strip()
+        # Handle prefill: response starts after the prefilled "{"
+        # So we need to prepend "{" to complete the JSON
+        if not content.startswith("{"):
+            content = "{" + content
+        # Handle markdown code blocks
+        if "```" in content:
+            content = content.split("```")[1]
+            if content.startswith("json"):
+                content = content[4:]
 
-            slot_data = json.loads(content)
-            slots = SlotInfo(**{k: v for k, v in slot_data.items() if v is not None})
-
-        except Exception as e:
-            # Enhanced fallback extraction with regex/keyword matching
-            slots = _extract_slots_fallback(query)
+        slot_data = json.loads(content)
+        slots = SlotInfo(**{k: v for k, v in slot_data.items() if v is not None})
 
     return {
         **state,
@@ -267,76 +240,7 @@ async def input_guard_node(state: GraphState) -> GraphState:
     }
 
 
-def _extract_slots_fallback(query: str) -> SlotInfo:
-    """Fallback slot extraction when LLM is unavailable."""
-    import re
 
-    lower_query = query.lower()
-
-    # Known service names (add more as needed)
-    known_services = [
-        "PaymentService",
-        "OrderService",
-        "UserService",
-        "NotificationService",
-        "InventoryService",
-        "payment-service",
-        "order-service",
-        "user-service",
-        "payment",
-        "order",
-        "user",
-        "inventory",
-        "notification",
-        "api",
-        "gateway",
-        "auth",
-        "database",
-        "redis",
-        "kafka",
-    ]
-
-    service_name = None
-    for svc in known_services:
-        if svc.lower() in lower_query:
-            service_name = svc
-            break
-
-    # Error types
-    error_type = None
-    error_keywords = {
-        "timeout": "timeout",
-        "latency": "latency",
-        "slow": "latency",
-        "crash": "crash",
-        "down": "down",
-        "error": "error",
-        "fail": "failure",
-        "connection": "connection",
-        "pool": "connection_pool",
-        "memory": "memory",
-        "cpu": "cpu",
-    }
-    for kw, etype in error_keywords.items():
-        if kw in lower_query:
-            error_type = etype
-            break
-
-    # Environment
-    environment = None
-    if "prod" in lower_query:
-        environment = "prod"
-    elif "staging" in lower_query:
-        environment = "staging"
-    elif "dev" in lower_query:
-        environment = "dev"
-
-    return SlotInfo(
-        service_name=service_name,
-        error_type=error_type,
-        environment=environment,
-        additional_context=query,
-    )
 
 
 def route_after_guard(state: GraphState) -> str:

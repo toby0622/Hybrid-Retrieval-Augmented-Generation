@@ -89,30 +89,16 @@ Just describe the issue you're seeing, and I'll help investigate!</response>
 async def chat_response_node(state: GraphState) -> GraphState:
     """
     Generate response for chat/greeting messages using LLM
+    
+    Raises:
+        RuntimeError: If LLM response generation fails.
     """
     query = state.get("query", "")
 
-    try:
-        llm = get_llm()
-        chat_chain = CHAT_RESPONSE_PROMPT | llm
-        result = await chat_chain.ainvoke({"query": query})
-        response = result.content.strip()
-    except Exception as e:
-        # Fallback to static response if LLM fails
-        lower_query = query.lower()
-        if any(kw in lower_query for kw in ["hello", "hi", "hey", "你好", "哈囉"]):
-            response = "你好！我是 DevOps Copilot，可以幫助你調查事件、分析日誌和查詢知識圖譜。請描述你遇到的問題，我會協助你診斷！"
-        elif "help" in lower_query or "what" in lower_query or "幫" in lower_query:
-            response = """我是 DevOps 事件回應助手，可以幫助你：
-
-• **調查事件** - 描述你看到的錯誤或問題
-• **分析日誌** - 貼上錯誤日誌或症狀
-• **查詢知識庫** - 搜尋過去的事件和文件
-• **找出根因** - 交叉比對拓撲與歷史資料
-
-請描述你的問題，我會幫你診斷！"""
-        else:
-            response = "我在這裡幫助處理 DevOps 事件和故障排除。有什麼我可以幫忙的嗎？"
+    llm = get_llm()
+    chat_chain = CHAT_RESPONSE_PROMPT | llm
+    result = await chat_chain.ainvoke({"query": query})
+    response = result.content.strip()
 
     return {**state, "response": response}
 

@@ -332,17 +332,30 @@ async def check_entity_conflicts(
 ) -> Dict[str, Any]:
     """
     Check if entity conflicts with existing entities (Entity Resolution)
+    Uses embedding-based semantic similarity for robust comparison.
     """
+    new_name = new_entity.get("name", "")
+    new_description = new_entity.get("description", "")
+    # Combine name and description for richer semantic representation
+    new_text = f"{new_name}: {new_description}" if new_description else new_name
+
     for existing in existing_entities:
-        # Simple similarity check - in production use embeddings
-        name_similarity = _compute_name_similarity(
-            new_entity.get("name", ""), existing.get("name", "")
+        existing_name = existing.get("name", "")
+        existing_description = existing.get("description", "")
+        existing_text = (
+            f"{existing_name}: {existing_description}"
+            if existing_description
+            else existing_name
         )
 
-        if name_similarity > 0.8:
+        # Compute semantic similarity using embeddings
+        similarity = await _compute_embedding_similarity(new_text, existing_text)
+
+        # Threshold 0.85 for semantic similarity (more robust than lexical)
+        if similarity > 0.85:
             return {
                 "has_conflict": True,
-                "confidence": name_similarity,
+                "confidence": similarity,
                 "existing_entity": existing,
                 "new_entity": new_entity,
             }
@@ -350,18 +363,29 @@ async def check_entity_conflicts(
     return {"has_conflict": False, "new_entity": new_entity}
 
 
-def _compute_name_similarity(name1: str, name2: str) -> float:
-    """Simple name similarity computation"""
-    name1 = name1.lower().replace("_", " ").replace("-", " ")
-    name2 = name2.lower().replace("_", " ").replace("-", " ")
+async def _compute_embedding_similarity(text1: str, text2: str) -> float:
+    """
+    Compute cosine similarity between two texts using embedding model.
+    Uses LM Studio embedding API for semantic comparison.
+    """
+    from app.nodes.retrieval import get_embedding
+    import numpy as np
 
-    words1 = set(name1.split())
-    words2 = set(name2.split())
+    try:
+        # Get embeddings for both texts
+        embedding1 = await get_embedding(text1)
+        embedding2 = await get_embedding(text2)
 
-    if not words1 or not words2:
-        return 0.0
+        # Convert to numpy arrays
+        vec1 = np.array(embedding1)
+        vec2 = np.array(embedding2)
 
-    intersection = words1 & words2
-    union = words1 | words2
+        # Compute cosine similarity
+        dot_product = np.dot(vec1, vec2)
+        norm1 = np.linalg.norm(vec1)
+        norm2 = np.linalg.norm(vec2)
 
-    return len(intersection) / len(union)
+        if norm1 == 0 or norm2 == 0:
+            return 0.0
+
+        return float(dot_product / (norm1 * norm2))
