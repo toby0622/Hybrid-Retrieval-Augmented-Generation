@@ -4,6 +4,7 @@ Starts the FastAPI server
 """
 
 import uvicorn
+
 from config import settings
 
 
@@ -19,13 +20,13 @@ def main():
 ║  Qdrant: {settings.qdrant_host}:{settings.qdrant_port:<42} ║
 ╚══════════════════════════════════════════════════════════════╝
     """)
-    
+
     uvicorn.run(
         "app.api:app",
         host=settings.api_host,
         port=settings.api_port,
         reload=settings.debug,
-        log_level="info" if settings.debug else "warning"
+        log_level="info" if settings.debug else "warning",
     )
 
 

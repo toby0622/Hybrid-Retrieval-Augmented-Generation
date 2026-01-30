@@ -3,25 +3,27 @@ HRAG FastAPI Application
 REST API endpoints for the HRAG system
 """
 
-import uuid
 import asyncio
 import json
-from typing import Optional, List, AsyncGenerator
-from fastapi import FastAPI, HTTPException, UploadFile, File, BackgroundTasks
+import uuid
+from typing import AsyncGenerator, List, Optional
+
+from fastapi import BackgroundTasks, FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
-from app.graph import run_query, graph
+from app.graph import graph, run_query
+from app.nodes.feedback import check_entity_conflicts, extract_entities_node
 from app.state import DiagnosticResponse, DiagnosticStep, SlotInfo
-from app.nodes.feedback import extract_entities_node, check_entity_conflicts
 from config import settings
-
 
 # --- API Models ---
 
+
 class ChatRequest(BaseModel):
     """Chat request model"""
+
     query: str
     thread_id: Optional[str] = None
     feedback: Optional[str] = None
@@ -30,6 +32,7 @@ class ChatRequest(BaseModel):
 
 class ReasoningStep(BaseModel):
     """Reasoning step for streaming"""
+
     id: str
     label: str
     status: str = "pending"
@@ -37,6 +40,7 @@ class ReasoningStep(BaseModel):
 
 class ChatResponse(BaseModel):
     """Chat response model"""
+
     thread_id: str
     response: str
     intent: Optional[str] = None
@@ -48,6 +52,7 @@ class ChatResponse(BaseModel):
 
 class EntityConflict(BaseModel):
     """Entity conflict for gardener review"""
+
     id: str
     type: str  # conflict, new
     entity_name: str
@@ -60,11 +65,13 @@ class EntityConflict(BaseModel):
 
 class GardenerTask(BaseModel):
     """Gardener task model"""
+
     tasks: List[EntityConflict]
 
 
 class GardenerAction(BaseModel):
     """Gardener approval action"""
+
     entity_id: str
     action: str  # approve, reject, merge
     modified_entity: Optional[dict] = None
@@ -72,6 +79,7 @@ class GardenerAction(BaseModel):
 
 class UploadResponse(BaseModel):
     """Upload response model"""
+
     file_name: str
     status: str
     entities_extracted: int
@@ -81,6 +89,7 @@ class UploadResponse(BaseModel):
 
 class HealthResponse(BaseModel):
     """Health check response"""
+
     status: str
     neo4j: str
     qdrant: str
@@ -92,7 +101,7 @@ class HealthResponse(BaseModel):
 app = FastAPI(
     title="HRAG Backend API",
     description="Hybrid Retrieval-Augmented Generation API for DevOps Incident Response",
-    version="0.1.0"
+    version="0.1.0",
 )
 
 # CORS middleware for frontend
@@ -110,6 +119,7 @@ gardener_tasks: dict = {}
 
 # --- Endpoints ---
 
+
 @app.get("/health", response_model=HealthResponse)
 async def health_check():
     """
@@ -119,13 +129,13 @@ async def health_check():
     neo4j_status = "disconnected"
     qdrant_status = "disconnected"
     llm_status = "disconnected"
-    
+
     # Check Neo4j
     try:
         from neo4j import GraphDatabase
+
         driver = GraphDatabase.driver(
-            settings.neo4j_uri,
-            auth=(settings.neo4j_user, settings.neo4j_password)
+            settings.neo4j_uri, auth=(settings.neo4j_user, settings.neo4j_password)
         )
         with driver.session() as session:
             session.run("RETURN 1")
@@ -133,35 +143,36 @@ async def health_check():
         neo4j_status = "connected"
     except Exception as e:
         neo4j_status = f"error: {str(e)[:30]}"
-    
+
     # Check Qdrant
     try:
         from qdrant_client import QdrantClient
+
         client = QdrantClient(host=settings.qdrant_host, port=settings.qdrant_port)
         client.get_collections()
         qdrant_status = "connected"
     except Exception as e:
         qdrant_status = f"error: {str(e)[:30]}"
-    
+
     # Check LLM
     try:
         import httpx
+
         async with httpx.AsyncClient(timeout=5.0) as client:
             response = await client.get(f"{settings.llm_base_url}/models")
             if response.status_code == 200:
                 llm_status = "connected"
     except Exception as e:
         llm_status = f"error: {str(e)[:30]}"
-    
-    overall_status = "healthy" if all(
-        s == "connected" for s in [neo4j_status, qdrant_status]
-    ) else "degraded"
-    
+
+    overall_status = (
+        "healthy"
+        if all(s == "connected" for s in [neo4j_status, qdrant_status])
+        else "degraded"
+    )
+
     return HealthResponse(
-        status=overall_status,
-        neo4j=neo4j_status,
-        qdrant=qdrant_status,
-        llm=llm_status
+        status=overall_status, neo4j=neo4j_status, qdrant=qdrant_status, llm=llm_status
     )
 
 
@@ -172,36 +183,58 @@ async def chat_stream(request: ChatRequest):
     Streams reasoning steps in real-time, then sends diagnostic.
     """
     thread_id = request.thread_id or str(uuid.uuid4())
-    
+
     async def generate() -> AsyncGenerator[str, None]:
         # Stream reasoning steps first
         reasoning_steps = [
-            {"id": "step_0", "label": "Input Guardrails: Analyzing query...", "status": "pending"},
-            {"id": "step_1", "label": "Slot Extraction: Identifying entities...", "status": "pending"},
-            {"id": "step_2", "label": "Graph Search: Querying topology...", "status": "pending"},
-            {"id": "step_3", "label": "Vector Search: Finding relevant documents...", "status": "pending"},
-            {"id": "step_4", "label": "MCP Tool: Executing data queries...", "status": "pending"},
-            {"id": "step_5", "label": "LLM Reasoning: Synthesizing diagnosis...", "status": "pending"},
+            {
+                "id": "step_0",
+                "label": "Input Guardrails: Analyzing query...",
+                "status": "pending",
+            },
+            {
+                "id": "step_1",
+                "label": "Slot Extraction: Identifying entities...",
+                "status": "pending",
+            },
+            {
+                "id": "step_2",
+                "label": "Graph Search: Querying topology...",
+                "status": "pending",
+            },
+            {
+                "id": "step_3",
+                "label": "Vector Search: Finding relevant documents...",
+                "status": "pending",
+            },
+            {
+                "id": "step_4",
+                "label": "MCP Tool: Executing data queries...",
+                "status": "pending",
+            },
+            {
+                "id": "step_5",
+                "label": "LLM Reasoning: Synthesizing diagnosis...",
+                "status": "pending",
+            },
         ]
-        
+
         # Stream each step with delay
         for i, step in enumerate(reasoning_steps):
             step["status"] = "active"
             yield f"data: {json.dumps({'type': 'reasoning', 'step': step})}\n\n"
             await asyncio.sleep(0.3)  # Small delay for animation
-            
+
             # Mark as completed
             step["status"] = "completed"
             yield f"data: {json.dumps({'type': 'reasoning', 'step': step})}\n\n"
-        
+
         # Now run the actual graph
         try:
             result = await run_query(
-                query=request.query,
-                thread_id=thread_id,
-                feedback=request.feedback
+                query=request.query, thread_id=thread_id, feedback=request.feedback
             )
-            
+
             # Send final response
             response_data = {
                 "type": "complete",
@@ -209,27 +242,27 @@ async def chat_stream(request: ChatRequest):
                 "response": result.get("response", ""),
                 "intent": result.get("intent", "chat"),
                 "diagnostic": result.get("diagnostic"),
-                "clarification_question": result.get("clarification_question")
+                "clarification_question": result.get("clarification_question"),
             }
-            
+
             # Serialize diagnostic if present (Pydantic model)
             if response_data["diagnostic"]:
                 response_data["diagnostic"] = response_data["diagnostic"].model_dump()
-            
+
             yield f"data: {json.dumps(response_data)}\n\n"
-            
+
         except Exception as e:
             yield f"data: {json.dumps({'type': 'error', 'message': str(e)})}\n\n"
-        
+
         yield "data: [DONE]\n\n"
-    
+
     return StreamingResponse(
         generate(),
         media_type="text/event-stream",
         headers={
             "Cache-Control": "no-cache",
             "Connection": "keep-alive",
-        }
+        },
     )
 
 
@@ -240,20 +273,18 @@ async def chat(request: ChatRequest):
     Processes user queries through the HRAG graph.
     """
     thread_id = request.thread_id or str(uuid.uuid4())
-    
+
     try:
         result = await run_query(
-            query=request.query,
-            thread_id=thread_id,
-            feedback=request.feedback
+            query=request.query, thread_id=thread_id, feedback=request.feedback
         )
-        
+
         intent = result.get("intent", "chat")
         response = result.get("response", "")
         diagnostic = result.get("diagnostic")
         reasoning_steps = result.get("reasoning_steps", [])
         clarification = result.get("clarification_question")
-        
+
         # Determine response type
         if diagnostic:
             response_type = "diagnostic"
@@ -263,13 +294,13 @@ async def chat(request: ChatRequest):
             response_type = "clarification"
         else:
             response_type = "text"
-        
+
         # Format reasoning steps
         formatted_steps = [
             ReasoningStep(id=f"step_{i}", label=step, status="completed")
             for i, step in enumerate(reasoning_steps)
         ]
-        
+
         return ChatResponse(
             thread_id=thread_id,
             response=response if not clarification else clarification,
@@ -277,17 +308,16 @@ async def chat(request: ChatRequest):
             response_type=response_type,
             reasoning_steps=formatted_steps if formatted_steps else None,
             diagnostic=diagnostic,
-            clarification_question=clarification
+            clarification_question=clarification,
         )
-        
+
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Processing error: {str(e)}")
 
 
 @app.post("/upload", response_model=UploadResponse)
 async def upload_knowledge(
-    file: UploadFile = File(...),
-    background_tasks: BackgroundTasks = None
+    file: UploadFile = File(...), background_tasks: BackgroundTasks = None
 ):
     """
     Upload knowledge document for ingestion.
@@ -296,23 +326,23 @@ async def upload_knowledge(
     try:
         content = await file.read()
         content_str = content.decode("utf-8")
-        
+
         # Extract entities
         entities = await extract_entities_node(content_str)
-        
+
         # Check for conflicts (mock existing entities)
         existing_entities = []  # TODO: Load from graph DB
-        
+
         conflicts = []
         new_entities = []
         task_ids = []
-        
+
         for entity in entities:
             conflict_check = await check_entity_conflicts(entity, existing_entities)
-            
+
             task_id = str(uuid.uuid4())
             task_ids.append(task_id)
-            
+
             if conflict_check.get("has_conflict"):
                 conflict = EntityConflict(
                     id=task_id,
@@ -321,7 +351,7 @@ async def upload_knowledge(
                     source=file.filename,
                     confidence=conflict_check.get("confidence", 0.0),
                     existing_entity=conflict_check.get("existing_entity"),
-                    new_entity=entity
+                    new_entity=entity,
                 )
                 conflicts.append(conflict)
                 gardener_tasks[task_id] = conflict
@@ -333,19 +363,19 @@ async def upload_knowledge(
                     source=file.filename,
                     confidence=0.95,
                     new_entity=entity,
-                    description=entity.get("description", "")
+                    description=entity.get("description", ""),
                 )
                 new_entities.append(new_task)
                 gardener_tasks[task_id] = new_task
-        
+
         return UploadResponse(
             file_name=file.filename,
             status="processed",
             entities_extracted=len(entities),
             conflicts_found=len(conflicts),
-            task_ids=task_ids
+            task_ids=task_ids,
         )
-        
+
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Upload error: {str(e)}")
 
@@ -365,28 +395,28 @@ async def gardener_action(action: GardenerAction):
     Process gardener action on an entity.
     """
     task_id = action.entity_id
-    
+
     if task_id not in gardener_tasks:
         raise HTTPException(status_code=404, detail="Task not found")
-    
+
     task = gardener_tasks[task_id]
-    
+
     if action.action == "approve":
         # TODO: Write entity to graph DB
         del gardener_tasks[task_id]
         return {"status": "approved", "message": "Entity written to knowledge graph"}
-    
+
     elif action.action == "reject":
         del gardener_tasks[task_id]
         return {"status": "rejected", "message": "Entity discarded"}
-    
+
     elif action.action == "merge":
         if action.modified_entity:
             # TODO: Update entity in graph DB
             pass
         del gardener_tasks[task_id]
         return {"status": "merged", "message": "Entity merged and updated"}
-    
+
     else:
         raise HTTPException(status_code=400, detail="Invalid action")
 
@@ -398,10 +428,11 @@ async def get_stats():
     """
     indexed_documents = 0
     knowledge_nodes = 0
-    
+
     # Get Qdrant document count
     try:
         from qdrant_client import QdrantClient
+
         client = QdrantClient(host=settings.qdrant_host, port=settings.qdrant_port)
         collections = client.get_collections()
         for col in collections.collections:
@@ -411,13 +442,13 @@ async def get_stats():
                 break
     except Exception as e:
         print(f"Qdrant stats error: {e}")
-    
+
     # Get Neo4j node count
     try:
         from neo4j import GraphDatabase
+
         driver = GraphDatabase.driver(
-            settings.neo4j_uri,
-            auth=(settings.neo4j_user, settings.neo4j_password)
+            settings.neo4j_uri, auth=(settings.neo4j_user, settings.neo4j_password)
         )
         with driver.session() as session:
             result = session.run("MATCH (n) RETURN count(n) as count")
@@ -426,10 +457,10 @@ async def get_stats():
         driver.close()
     except Exception as e:
         print(f"Neo4j stats error: {e}")
-    
+
     return {
         "indexed_documents": indexed_documents,
         "knowledge_nodes": knowledge_nodes,
         "pending_tasks": len(gardener_tasks),
-        "active_threads": 0
+        "active_threads": 0,
     }
