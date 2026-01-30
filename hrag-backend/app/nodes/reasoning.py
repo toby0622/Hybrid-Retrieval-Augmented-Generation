@@ -135,35 +135,18 @@ async def mcp_tool_node(state: GraphState) -> GraphState:
     """
     MCP Tool Use Node
 
-    Simulates MCP protocol calls to external tools (SQL queries, metrics, etc.)
-    In production, this would connect to actual MCP servers.
+    Connects to MCP servers for real-time data queries (SQL, metrics, etc.)
+    Currently skipped until MCP integration is implemented.
     """
-    slots = state.get("slots", SlotInfo())
-
-    # Simulate MCP tool call results
-    mcp_results: List[RetrievalResult] = []
-
-    # Mock SQL query result
-    if slots.service_name:
-        mcp_results.append(
-            RetrievalResult(
-                source="mcp_tool",
-                title="SQL Query: Connection Metrics",
-                content=f"""SELECT avg(pool_size), max(wait_time) FROM metrics 
-WHERE service='{slots.service_name}' AND timestamp > NOW() - INTERVAL '1 hour'
-Result: avg_pool=8, max_wait=4523ms""",
-                metadata={"tool": "sql_query", "database": "metrics_db"},
-                confidence=0.95,
-                raw_data={
-                    "avg_pool_size": 8,
-                    "max_wait_time_ms": 4523,
-                    "active_connections": 10,
-                    "max_pool_size": 10,
-                },
-            )
-        )
-
-    return {**state, "mcp_results": mcp_results}
+    # TODO: Implement actual MCP protocol connection
+    # This node should connect to real MCP servers for:
+    # - SQL queries to metrics databases
+    # - Real-time monitoring data
+    # - Log aggregation systems
+    print("[MCP] Warning: MCP integration not yet implemented. Skipping MCP tool queries.")
+    
+    # Return empty results - reasoning node will proceed without MCP data
+    return {**state, "mcp_results": []}
 
 
 async def reasoning_node(state: GraphState) -> GraphState:

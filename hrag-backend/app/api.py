@@ -330,7 +330,7 @@ async def upload_knowledge(
         # Extract entities
         entities = await extract_entities_node(content_str)
 
-        # Check for conflicts (mock existing entities)
+        # Check for conflicts with existing entities
         existing_entities = []  # TODO: Load from graph DB
 
         conflicts = []

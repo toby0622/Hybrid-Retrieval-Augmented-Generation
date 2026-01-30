@@ -94,7 +94,9 @@ async def graph_search_node(state: GraphState) -> GraphState:
     Graph Search Node (Neo4j)
 
     Queries the knowledge graph for topology and relationships.
-    Falls back to mock data if Neo4j is unavailable.
+    
+    Raises:
+        RuntimeError: If graph search fails.
     """
     slots = state.get("slots", SlotInfo())
     query = state.get("query", "")

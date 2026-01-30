@@ -40,12 +40,7 @@ export function KnowledgeInterface({ addToast }: KnowledgeInterfaceProps) {
         });
       } catch (error) {
         console.error('Stats error:', error);
-        // Use mock data matching init_db.py on error
-        setStats({
-          indexedDocuments: 8,  // 8 documents in Qdrant
-          knowledgeNodes: 17,   // 17 nodes in Neo4j
-          pendingTasks: 2
-        });
+        throw new Error('Failed to load stats from backend');
       }
 
       // Load gardener tasks
@@ -70,32 +65,7 @@ export function KnowledgeInterface({ addToast }: KnowledgeInterfaceProps) {
         setTasks(mappedTasks);
       } catch (error) {
         console.error('Tasks error:', error);
-        // Use mock data on error
-        setTasks([
-          {
-            id: 101,
-            type: 'conflict',
-            entityName: 'PaymentGateway_Timeout',
-            source: 'Post-Mortem-2025-10.pdf',
-            confidence: 0.92,
-            existingEntity: {
-              name: 'Payment_Timeout_Config',
-              desc: 'Default timeout set to 3000ms in config map.'
-            },
-            newEntity: {
-              name: 'PaymentGateway_Timeout',
-              desc: 'Timeout observed at 5000ms during peak load.'
-            }
-          },
-          {
-            id: 102,
-            type: 'new',
-            entityName: 'Redis_Cluster_Bravo',
-            source: 'Infra_Topology_Update.md',
-            confidence: 0.98,
-            desc: 'New Redis cluster provisioned for caching layer in region ap-northeast-1.'
-          }
-        ]);
+        throw new Error('Failed to load gardener tasks from backend');
       }
     } finally {
       setIsLoading(false);
@@ -114,9 +84,7 @@ export function KnowledgeInterface({ addToast }: KnowledgeInterfaceProps) {
       }
     } catch (error) {
       console.error('Action error:', error);
-      // Still update UI on error (optimistic update)
-      setTasks(prev => prev.filter(t => t.id !== id));
-      addToast(action === 'approve' ? 'Entity approved (mock mode).' : 'Entity rejected (mock mode).', 'info');
+      addToast(`Failed to ${action} entity. Backend service unavailable.`, 'error');
     }
   };
 
@@ -132,18 +100,7 @@ export function KnowledgeInterface({ addToast }: KnowledgeInterfaceProps) {
       addToast(`Extracted ${response.entities_extracted} entities from ${file.name}`, 'success');
     } catch (error) {
       console.error('Upload error:', error);
-      
-      // Mock response on error
-      const newTask: GardenerTask = {
-        id: Date.now(),
-        type: 'new',
-        entityName: 'New_Entity_From_Upload',
-        source: file.name,
-        confidence: 0.85,
-        desc: 'Automatically extracted entity from uploaded document.'
-      };
-      setTasks(prev => [newTask, ...prev]);
-      addToast('File parsed and new entities extracted (mock mode).', 'success');
+      addToast('Upload failed. Backend service unavailable.', 'error');
     } finally {
       setIsUploading(false);
     }
