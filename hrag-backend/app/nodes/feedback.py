@@ -371,21 +371,20 @@ async def _compute_embedding_similarity(text1: str, text2: str) -> float:
     from app.nodes.retrieval import get_embedding
     import numpy as np
 
-    try:
-        # Get embeddings for both texts
-        embedding1 = await get_embedding(text1)
-        embedding2 = await get_embedding(text2)
+    # Get embeddings for both texts
+    embedding1 = await get_embedding(text1)
+    embedding2 = await get_embedding(text2)
 
-        # Convert to numpy arrays
-        vec1 = np.array(embedding1)
-        vec2 = np.array(embedding2)
+    # Convert to numpy arrays
+    vec1 = np.array(embedding1)
+    vec2 = np.array(embedding2)
 
-        # Compute cosine similarity
-        dot_product = np.dot(vec1, vec2)
-        norm1 = np.linalg.norm(vec1)
-        norm2 = np.linalg.norm(vec2)
+    # Compute cosine similarity
+    dot_product = np.dot(vec1, vec2)
+    norm1 = np.linalg.norm(vec1)
+    norm2 = np.linalg.norm(vec2)
 
-        if norm1 == 0 or norm2 == 0:
-            return 0.0
+    if norm1 == 0 or norm2 == 0:
+        return 0.0
 
-        return float(dot_product / (norm1 * norm2))
+    return float(dot_product / (norm1 * norm2))

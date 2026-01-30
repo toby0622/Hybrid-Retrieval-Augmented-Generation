@@ -136,17 +136,16 @@ async def slot_check_node(state: GraphState) -> GraphState:
         "\n".join(known_parts) if known_parts else "No specific details provided yet."
     )
 
-    try:
-        llm = get_llm()
-        chain = CLARIFICATION_PROMPT | llm
-        result = await chain.ainvoke(
-            {
-                "query": query,
-                "known_info": known_info,
-                "missing_slots": ", ".join(missing),
-            }
-        )
-        clarification = result.content.strip()
+    llm = get_llm()
+    chain = CLARIFICATION_PROMPT | llm
+    result = await chain.ainvoke(
+        {
+            "query": query,
+            "known_info": known_info,
+            "missing_slots": ", ".join(missing),
+        }
+    )
+    clarification = result.content.strip()
 
     return {
         **state,

@@ -196,18 +196,17 @@ async def input_guard_node(state: GraphState) -> GraphState:
     llm = get_llm()
 
     # Step 1: Classify intent
-    try:
-        classification_chain = CLASSIFICATION_PROMPT | llm
-        result = await classification_chain.ainvoke({"query": query})
-        intent_raw = result.content.strip().lower()
+    classification_chain = CLASSIFICATION_PROMPT | llm
+    result = await classification_chain.ainvoke({"query": query})
+    intent_raw = result.content.strip().lower()
 
-        # Map to valid intent
-        if "incident" in intent_raw:
-            intent: Literal["chat", "incident", "end"] = "incident"
-        elif "end" in intent_raw:
-            intent = "end"
-        else:
-            intent = "chat"
+    # Map to valid intent
+    if "incident" in intent_raw:
+        intent: Literal["chat", "incident", "end"] = "incident"
+    elif "end" in intent_raw:
+        intent = "end"
+    else:
+        intent = "chat"
 
     # Step 2: For incidents, extract slots
     slots = SlotInfo()
