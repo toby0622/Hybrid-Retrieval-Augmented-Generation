@@ -244,15 +244,15 @@ async def vector_search_node(state: GraphState) -> GraphState:
                     Filter(must=filter_conditions) if filter_conditions else None
                 )
 
-                # Execute search
-                search_results = client.search(
+                # Execute search using query_points (Qdrant client >= 1.10)
+                search_results = client.query_points(
                     collection_name=settings.qdrant_collection,
-                    query_vector=query_vector,
+                    query=query_vector,
                     limit=5,
                     query_filter=search_filter,
                 )
 
-                for hit in search_results:
+                for hit in search_results.points:
                     results.append(
                         RetrievalResult(
                             source="vector",
