@@ -13,10 +13,58 @@ from qdrant_client.models import FieldCondition, Filter, MatchText
 
 from app.domain_init import get_active_domain
 from app.state import DynamicSlotInfo, GraphState, RetrievalResult, SlotInfo
+from app.schema_registry import SchemaRegistry
+from langchain_core.prompts import ChatPromptTemplate
+from langchain_openai import ChatOpenAI
 from config import settings
 
 # Embedding dimension for embeddinggemma-300m (768 dimensions)
 EMBEDDING_DIM = 768
+
+
+def get_llm():
+    return ChatOpenAI(
+        base_url=settings.llm_base_url,
+        api_key=settings.llm_api_key,
+        model=settings.llm_model_name,
+        temperature=0.0,
+    )
+
+
+async def generate_cypher_query(query: str, schema_str: str, slots: DynamicSlotInfo) -> str:
+    """Generate Cypher query using LLM and Schema."""
+    
+    llm = get_llm()
+    
+    system_prompt = """You are a Neo4j Cypher expert.
+Your task is to generate a Cypher query to answer the user's question based on the provided Graph Schema.
+
+# Graph Schema
+{schema}
+
+# Rules
+1. Use ONLY the node labels and relationship types defined in the schema.
+2. Do not use markdown backticks in your output. Just return the raw Cypher query.
+3. Use case-insensitive string matching for properties (e.g. `toLower(n.name) CONTAINS toLower('value')`).
+4. Limit results to 20 unless specified otherwise.
+5. Return readable properties to help user understand the context.
+"""
+
+    prompt = ChatPromptTemplate.from_messages([
+        ("system", system_prompt),
+        ("human", "User Query: {query}\n\nExtracted Slots: {slots}"),
+    ])
+    
+    chain = prompt | llm
+    
+    response = await chain.ainvoke({
+        "schema": schema_str,
+        "query": query,
+        "slots": slots.to_display_string() # Assuming to_display_string exists, otherwise str(slots)
+    })
+    
+    cypher = response.content.replace("```cypher", "").replace("```", "").strip()
+    return cypher
 
 
 class Neo4jClient:
@@ -122,15 +170,28 @@ async def graph_search_node(state: GraphState) -> GraphState:
                 # Add all slots as parameters
                 params.update(slots.get_filled_slots())
                 
-                # Determine which Cypher query to run
-                # Default to primary_search
-                cypher = current_domain.graph_queries.primary_search
                 
-                # Simple heuristic: if specific intent matches a query type (future)
-                # For now, we rely on the primary search being robust enough
+                # Determine which Cypher query to run
+                cypher = ""
+                
+                # Try to generate dynamic query first
+                if current_domain.schema_name:
+                    schema = SchemaRegistry.get_schema(current_domain.schema_name)
+                    if schema and schema.extraction_prompt:
+                        print(f"[GraphSearch] Generating dynamic Cypher for schema: {current_domain.schema_name}")
+                        try:
+                            cypher = await generate_cypher_query(query, schema.extraction_prompt, slots)
+                            print(f"[GraphSearch] Generated Cypher: {cypher}")
+                        except Exception as gen_err:
+                             print(f"[GraphSearch] Cypher generation failed: {gen_err}")
+                
+                # Fallback to configured primary search
+                if not cypher:
+                     print("[GraphSearch] Using fallback primary_search query.")
+                     cypher = current_domain.graph_queries.primary_search
                 
                 if not cypher:
-                    print("[GraphSearch] Warning: No primary_search query defined for domain.")
+                    print("[GraphSearch] Warning: No efficient query source found.")
                     return {**state, "graph_results": []}
 
                 result = await session.run(cypher, **params)
