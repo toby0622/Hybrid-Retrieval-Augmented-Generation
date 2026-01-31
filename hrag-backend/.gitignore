@@ -100,3 +100,6 @@ logs/
 # Local development
 .env.local
 .env.*.local
+
+# Dataset
+scripts/enron_mail_dataset/
