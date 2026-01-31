@@ -138,19 +138,33 @@ class SchemaRegistry:
                 ))
 
         if hasattr(module, "RELATION_SCHEMAS"):
-            relation_dict = module.RELATION_SCHEMAS
-            for relation_type, schema in relation_dict.items():
-                # schema is a RelationSchema dataclass
-                # Get source/target entity names
-                source = schema.from_entity.value if hasattr(schema.from_entity, "value") else str(schema.from_entity)
-                target = schema.to_entity.value if hasattr(schema.to_entity, "value") else str(schema.to_entity)
-                relations.append(RelationType(
-                    name=schema.name,
-                    source=source,
-                    target=target,
-                    description=schema.description,
-                    properties=schema.properties,
-                ))
+            relation_data = module.RELATION_SCHEMAS
+            
+            # Handle standard Dict format (Legacy / Enron style)
+            if isinstance(relation_data, dict):
+                for relation_type, schema in relation_data.items():
+                    # schema is a RelationSchema dataclass
+                    source = schema.from_entity.value if hasattr(schema.from_entity, "value") else str(schema.from_entity)
+                    target = schema.to_entity.value if hasattr(schema.to_entity, "value") else str(schema.to_entity)
+                    relations.append(RelationType(
+                        name=schema.name,
+                        source=source,
+                        target=target,
+                        description=schema.description,
+                        properties=schema.properties,
+                    ))
+            
+            # Handle List format (New / DevOps style)
+            elif isinstance(relation_data, list):
+                for schema in relation_data:
+                    # schema is a Relation dataclass
+                    relations.append(RelationType(
+                        name=schema.name,
+                        source=schema.source,
+                        target=schema.target,
+                        description=schema.description,
+                        properties=getattr(schema, "properties", []),
+                    ))
 
         # Fallback: Check for EntityType enum (dict-value pattern)
         if not entities and hasattr(module, "EntityType"):

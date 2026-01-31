@@ -36,7 +36,8 @@ def _get_classification_prompt(domain_config) -> ChatPromptTemplate:
     categories_xml = "<categories>\n"
     for intent in domain_config.intents:
         keywords = domain_config.intent_keywords.get(intent, [])
-        keywords_str = ", ".join(keywords) if keywords else "general query"
+        # Ensure all keywords are strings (YAML might parse numbers like 500 as int)
+        keywords_str = ", ".join([str(k) for k in keywords]) if keywords else "general query"
         categories_xml += f'  <category name="{intent}">\n'
         categories_xml += f"    Keywords: {keywords_str}\n"
         categories_xml += "  </category>\n"

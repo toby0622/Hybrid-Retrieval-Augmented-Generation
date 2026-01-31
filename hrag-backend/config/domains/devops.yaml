@@ -1,0 +1,132 @@
+# DevOps Domain Configuration
+# For use with DevOps incident data and post-mortems (devops_schema.py)
+
+name: devops
+display_name: "DevOps Copilot"
+description: "AI SRE for incident investigation and root cause analysis"
+schema: devops  # References devops_schema.py
+
+# Intent classification
+intents:
+  - incident    # Investigating an outage or error
+  - status      # Checking system health
+  - chat        # General conversation
+  - end         # End conversation
+
+intent_keywords:
+  incident:
+    - error
+    - failed
+    - crash
+    - exception
+    - timeout
+    - latency
+    - 500
+    - slow
+    - down
+    - outage
+  status:
+    - health
+    - status
+    - uptime
+    - load
+    - cpu
+    - memory
+
+# Slot filling configuration
+slots:
+  required:
+    - service_name
+  optional:
+    - error_type
+    - environment
+    - timestamp
+    - trace_id
+  examples:
+    service_name:
+      - "auth-service"
+      - "payment-gateway"
+      - "user-api"
+    error_type:
+      - "ConnectionRefused"
+      - "NullPointerException"
+      - "TimeoutError"
+    environment:
+      - "production"
+      - "staging"
+      - "k8s-cluster-1"
+
+# Classification prompt configuration
+classification_prompt:
+  system_identity: |
+    You are IntentClassifier, an AI component within the DevOps Copilot system.
+    Your responsibility is to classify user messages about system incidents and operational status.
+  capabilities:
+    - Identify service outages and performance issues
+    - Analyze error logs and stack traces
+    - Check service health and dependencies
+    - Search for similar past incidents
+
+# Clarification prompt configuration  
+clarification_prompt:
+  system_identity: |
+    You are an SRE Assistant helping to triage an incident.
+    Your goal is to gather critical information like Service Name and Error Type quickly.
+  examples:
+    - known: "Error: Connection timeout"
+      missing: "service_name"
+      question: "Which service is experiencing the connection timeout? (e.g., auth-service, db-primary)"
+    - known: "Service: payment-api"
+      missing: "error_type, environment"
+      question: "What specific error are you seeing in payment-api, and is this in production?"
+
+# Reasoning prompt configuration
+reasoning_prompt:
+  system_identity: |
+    You are DiagnosticReasoner, an expert Site Reliability Engineer (SRE).
+    Your responsibility is to analyze incidents using the "Four Golden Signals" and topology data.
+  capabilities:
+    - Correlate errors across microservices
+    - Identifying root causes from graph topology
+    - Analyzing impact propagation
+    - Recommending mitigation steps (restart, rollback, scale)
+
+# Chat response configuration
+chat_prompt:
+  system_identity: |
+    You are DevOps Copilot, a specialized SRE assistant.
+    You help engineers diagnose production issues and maintain system reliability.
+  capabilities:
+    - Incident investigation and troubleshooting
+    - Log analysis and pattern matching
+    - Architecture dependency mapping
+    - Post-mortem search
+
+# Database queries
+graph_queries:
+  primary_search: |
+    MATCH (s:Service)
+    WHERE toLower(s.name) CONTAINS toLower($hint)
+    OPTIONAL MATCH (s)-[r:DEPENDS_ON]-(dep:Service)
+    OPTIONAL MATCH (inc:Incident)-[:AFFECTS]->(s)
+    RETURN s.name as service, s.version as version,
+           collect(distinct dep.name) as dependencies,
+           collect(distinct inc.description) as recent_incidents
+    LIMIT 5
+    
+  incident_search: |
+    MATCH (inc:Incident)-[:AFFECTS]->(s:Service)
+    WHERE toLower(s.name) CONTAINS toLower($hint)
+       OR toLower(inc.description) CONTAINS toLower($hint)
+    RETURN inc, s
+    ORDER BY inc.created_at DESC
+    LIMIT 10
+
+# Vector search configuration
+vector_filter_fields:
+  - service
+  - level    # log level
+  - trace_id
+
+# Response language
+response_language: "zh-TW"

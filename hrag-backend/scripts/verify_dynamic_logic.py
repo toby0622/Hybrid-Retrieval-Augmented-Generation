@@ -99,6 +99,62 @@ async def verify_dynamic_system():
         else:
             print("No Neo4j query executed")
 
+
+    # ... previous email verification ...
+    
+    # 4. SWITCHOVER: Switch to DevOps Domain
+    print("\n[4] Switching to DevOps Domain...")
+    if "devops" not in domains:
+        print("Failed to discover 'devops' domain")
+    else:
+        DomainRegistry.set_active("devops")
+        active = DomainRegistry.get_active()
+        print(f"Active domain set to: {active.display_name}")
+        
+        # 5. Verify DevOps Prompt
+        print("\n[5] Verifying DevOps Prompts...")
+        prompt_template = _get_classification_prompt(active)
+        messages = prompt_template.format_messages(query="System is down")
+        system_msg = messages[0].content
+        
+        if "DevOps" in system_msg and "IntentClassifier" in system_msg:
+             print("Classification prompt correctly loaded from devops.yaml")
+             print(f"   Identity: {system_msg.splitlines()[0]}")
+        else:
+             print("Prompt content mismatch for DevOps")
+             print(system_msg)
+
+        # 6. Verify DevOps Graph Query
+        print("\n[6] Verifying DevOps Graph Retrieval...")
+        state = {
+            "query": "auth-service failing", 
+            "slots": DynamicSlotInfo(slots={"service_name": "auth-service"})
+        }
+        
+        # Reuse patched client
+        with patch.object(Neo4jClient, 'get_driver', return_value=mock_driver):
+            await graph_search_node(state)
+            
+            calls = mock_session.run.call_args_list
+            # Get the *last* call (since we ran one for email before)
+            if len(calls) >= 2:
+                args, kwargs = calls[-1]
+                query_str = args[0]
+                params = kwargs
+                
+                print("Graph search executed")
+                if "MATCH (s:Service)" in query_str:
+                    print("Correct 'primary_search' query from devops.yaml used")
+                else:
+                    print(f"Unexpected query used: {query_str[:50]}...")
+                
+                if params.get("service_name") == "auth-service":
+                     print("Parameters correctly bound (service_name='auth-service')")
+                else:
+                     print(f"Parameter binding failed: {params}")
+            else:
+                print("No new Neo4j query executed")
+
     print("\nVerification Complete!")
 
 if __name__ == "__main__":
