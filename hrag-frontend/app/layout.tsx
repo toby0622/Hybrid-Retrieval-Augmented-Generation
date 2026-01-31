@@ -1,15 +1,35 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import localFont from "next/font/local";
 import "./globals.css";
 
-const geistSans = Geist({
+const geistSans = localFont({
+  src: [
+    { path: "../public/Geist/Geist-Thin.ttf", weight: "100" },
+    { path: "../public/Geist/Geist-ExtraLight.ttf", weight: "200" },
+    { path: "../public/Geist/Geist-Light.ttf", weight: "300" },
+    { path: "../public/Geist/Geist-Regular.ttf", weight: "400" },
+    { path: "../public/Geist/Geist-Medium.ttf", weight: "500" },
+    { path: "../public/Geist/Geist-SemiBold.ttf", weight: "600" },
+    { path: "../public/Geist/Geist-Bold.ttf", weight: "700" },
+    { path: "../public/Geist/Geist-ExtraBold.ttf", weight: "800" },
+    { path: "../public/Geist/Geist-Black.ttf", weight: "900" },
+  ],
   variable: "--font-geist-sans",
-  subsets: ["latin"],
 });
 
-const geistMono = Geist_Mono({
+const geistMono = localFont({
+  src: [
+    { path: "../public/Geist_Mono/GeistMono-Thin.ttf", weight: "100" },
+    { path: "../public/Geist_Mono/GeistMono-ExtraLight.ttf", weight: "200" },
+    { path: "../public/Geist_Mono/GeistMono-Light.ttf", weight: "300" },
+    { path: "../public/Geist_Mono/GeistMono-Regular.ttf", weight: "400" },
+    { path: "../public/Geist_Mono/GeistMono-Medium.ttf", weight: "500" },
+    { path: "../public/Geist_Mono/GeistMono-SemiBold.ttf", weight: "600" },
+    { path: "../public/Geist_Mono/GeistMono-Bold.ttf", weight: "700" },
+    { path: "../public/Geist_Mono/GeistMono-ExtraBold.ttf", weight: "800" },
+    { path: "../public/Geist_Mono/GeistMono-Black.ttf", weight: "900" },
+  ],
   variable: "--font-geist-mono",
-  subsets: ["latin"],
 });
 
 export const metadata: Metadata = {
