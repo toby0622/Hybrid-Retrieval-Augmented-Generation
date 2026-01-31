@@ -1,14 +1,13 @@
 """
 Slot Filling Node
-Checks for required information and generates clarification questions
+Checks for required information and generates clarification questions based on active domain.
 """
-
-from typing import List
 
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_openai import ChatOpenAI
 
-from app.state import GraphState, SlotInfo
+from app.domain_init import get_active_domain
+from app.state import DynamicSlotInfo, GraphState, SlotInfo
 from config import settings
 
 
@@ -22,77 +21,81 @@ def get_llm():
 
 
 # =============================================================================
-# CLARIFICATION_PROMPT - Clarification Question Generation
-# Anthropic 10-Element Framework Applied
+# Dynamic Prompt Generation
 # =============================================================================
-CLARIFICATION_PROMPT = ChatPromptTemplate.from_messages(
-    [
-        (
-            "system",
-            """<!-- 1. Task Context -->
-You are ClarificationAgent, a component of the DevOps Copilot system.
-Your responsibility is to generate clear, targeted questions to gather missing incident information.
-You help ensure the diagnostic system has sufficient data to provide accurate root cause analysis.
+
+
+def _get_clarification_prompt(domain_config) -> ChatPromptTemplate:
+    """Generate clarification prompt based on domain config."""
+    
+    # Generate examples string
+    examples_xml = "<examples>\n"
+    if domain_config.clarification_prompt.examples:
+        for ex in domain_config.clarification_prompt.examples:
+            # Handle both dict-based and simple examples
+            if isinstance(ex, dict):
+                known = ex.get("known", "")
+                missing = ex.get("missing", "")
+                question = ex.get("question", "")
+                examples_xml += "  <example>\n"
+                examples_xml += f"    <known>{known}</known>\n"
+                examples_xml += f"    <missing>{missing}</missing>\n"
+                examples_xml += f"    <question>{question}</question>\n"
+                examples_xml += "  </example>\n"
+    elif domain_config.slots.required:
+        # Fallback simplified example
+        examples_xml += "  <example>\n"
+        examples_xml += "    <known>Partial info provided</known>\n"
+        examples_xml += f"    <missing>{domain_config.slots.required[0]}</missing>\n"
+        examples_xml += f"    <question>Could you provide the {domain_config.slots.required[0]}?</question>\n"
+        examples_xml += "  </example>\n"
+    examples_xml += "</examples>"
+
+    # List priorities
+    priority_list = ""
+    for i, slot in enumerate(domain_config.slots.required, 1):
+        priority_list += f"{i}. {slot} (REQUIRED)\n"
+    for i, slot in enumerate(domain_config.slots.optional, len(domain_config.slots.required) + 1):
+        priority_list += f"{i}. {slot} (OPTIONAL)\n"
+
+    system_prompt = f"""<!-- 1. Task Context -->
+{domain_config.clarification_prompt.system_identity or "You are ClarificationAgent."}
+Your responsibility is to generate clear, targeted questions to gather missing information.
 
 <!-- 2. Tone Context -->
-Be professional, concise, and helpful.
-Frame questions in a way that guides the user toward providing specific technical details.
-Use Traditional Chinese (繁體中文) for responses.
+Be professional, concise, and helpful. Guide the user toward providing specific details.
+Use {domain_config.response_language} for responses.
 
 <!-- 3. Background Data -->
 <current_context>
-  <known_information>{known_info}</known_information>
-  <missing_information>{missing_slots}</missing_information>
-  <original_query>{query}</original_query>
+  <known_information>{{known_info}}</known_information>
+  <missing_information>{{missing_slots}}</missing_information>
+  <original_query>{{query}}</original_query>
 </current_context>
 
 <!-- 4. Detailed Task Description & Rules -->
 Generate ONE clarification question to gather the most critical missing information.
 
-PRIORITY ORDER for missing information:
-1. service_name - Which service/component is affected (MOST IMPORTANT)
-2. error_type - What type of error/symptom is observed
-3. environment - Which environment (prod/staging/dev)
-4. timestamp - When did the issue occur
-5. additional_context - Any other relevant details
+PRIORITY ORDER:
+{priority_list}
 
 RULES:
 1. Ask about only ONE missing field per question
 2. Keep the question under 50 words
 3. Reference what you already know to show context awareness
 4. Provide examples of valid answers when helpful
-5. Be specific - avoid vague questions like "can you tell me more?"
 
 <!-- 5. Examples -->
-<examples>
-  <example>
-    <known>Error type: timeout</known>
-    <missing>service_name</missing>
-    <question>您提到發生了 timeout 錯誤，請問是哪個服務或元件出現這個問題？例如：PaymentService、order-api、Redis 等。</question>
-  </example>
-  <example>
-    <known>Service: PaymentService</known>
-    <missing>error_type</missing>
-    <question>PaymentService 目前出現什麼樣的症狀？例如：回應緩慢、連線錯誤、服務無回應、記憶體不足等。</question>
-  </example>
-  <example>
-    <known>Service: order-api, Error: latency</known>
-    <missing>environment</missing>
-    <question>order-api 的延遲問題是發生在哪個環境？（prod / staging / dev）</question>
-  </example>
-</examples>
+{examples_xml}
 
 <!-- 9. Output Formatting -->
-Output: A single clarification question in Traditional Chinese.
-Do not include any prefixes, labels, or explanations - just the question itself.""",
-        ),
-        (
-            "human",
-            """<!-- 7. Immediate Task -->
-Based on the context provided, generate the most appropriate clarification question.""",
-        ),
-    ]
-)
+Output: A single clarification question in {domain_config.response_language}.
+Do not include any prefixes, labels, or explanations - just the question itself."""
+
+    return ChatPromptTemplate.from_messages([
+        ("system", system_prompt),
+        ("human", "Based on the context provided, generate the most appropriate clarification question."),
+    ])
 
 
 MAX_CLARIFICATION_ROUNDS = 3
@@ -105,9 +108,25 @@ async def slot_check_node(state: GraphState) -> GraphState:
     Checks if we have sufficient information to proceed with retrieval.
     If not, generates a clarification question.
     """
-    slots = state.get("slots", SlotInfo())
+    # Handle both legacy and dynamic slot info
+    slots = state.get("slots")
+    if isinstance(slots, SlotInfo):
+        slots = slots.to_dynamic()
+    elif slots is None:
+        slots = DynamicSlotInfo()
+
     query = state.get("query", "")
     clarification_count = state.get("clarification_count", 0)
+    
+    current_domain = get_active_domain()
+    if not current_domain:
+        return {**state, "clarification_question": None}
+
+    # Ensure slots are configured with current domain rules
+    slots.configure(
+        required=current_domain.slots.required,
+        optional=current_domain.slots.optional
+    )
 
     # Check if slots are sufficient or max rounds reached
     if slots.is_sufficient() or clarification_count >= MAX_CLARIFICATION_ROUNDS:
@@ -120,32 +139,27 @@ async def slot_check_node(state: GraphState) -> GraphState:
         return {**state, "clarification_question": None}
 
     # Build known info string
-    known_parts = []
-    if slots.service_name:
-        known_parts.append(f"Service: {slots.service_name}")
-    if slots.error_type:
-        known_parts.append(f"Error type: {slots.error_type}")
-    if slots.timestamp:
-        known_parts.append(f"Time: {slots.timestamp}")
-    if slots.environment:
-        known_parts.append(f"Environment: {slots.environment}")
-    if slots.additional_context:
-        known_parts.append(f"Context: {slots.additional_context}")
-
-    known_info = (
-        "\n".join(known_parts) if known_parts else "No specific details provided yet."
-    )
+    filled = slots.get_filled_slots()
+    known_info = "\n".join([f"{k}: {v}" for k, v in filled.items()])
+    if not known_info:
+        known_info = "No specific details provided yet."
 
     llm = get_llm()
-    chain = CLARIFICATION_PROMPT | llm
-    result = await chain.ainvoke(
-        {
-            "query": query,
-            "known_info": known_info,
-            "missing_slots": ", ".join(missing),
-        }
-    )
-    clarification = result.content.strip()
+    prompt = _get_clarification_prompt(current_domain)
+    chain = prompt | llm
+    
+    try:
+        result = await chain.ainvoke(
+            {
+                "query": query,
+                "known_info": known_info,
+                "missing_slots": ", ".join(missing),
+            }
+        )
+        clarification = result.content.strip()
+    except Exception as e:
+        print(f"[SlotFilling] generation error: {e}")
+        clarification = f"Could you please provide more details regarding {missing[0]}?"
 
     return {
         **state,

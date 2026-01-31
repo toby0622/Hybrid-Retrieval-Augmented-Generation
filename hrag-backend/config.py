@@ -32,6 +32,11 @@ class Settings(BaseSettings):
     api_port: int = 8000
     debug: bool = True
 
+    # Domain Configuration
+    active_domain: str = "email"  # Default domain (can be: email, devops, etc.)
+    scripts_path: str = "scripts"  # Path to *_schema.py files
+    domains_path: str = "config/domains"  # Path to *.yaml domain configs
+
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"

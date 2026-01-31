@@ -11,7 +11,8 @@ from neo4j import AsyncGraphDatabase
 from qdrant_client import QdrantClient
 from qdrant_client.models import FieldCondition, Filter, MatchText
 
-from app.state import GraphState, RetrievalResult, SlotInfo
+from app.domain_init import get_active_domain
+from app.state import DynamicSlotInfo, GraphState, RetrievalResult, SlotInfo
 from config import settings
 
 # Embedding dimension for embeddinggemma-300m (768 dimensions)
@@ -93,13 +94,21 @@ async def graph_search_node(state: GraphState) -> GraphState:
     """
     Graph Search Node (Neo4j)
 
-    Queries the knowledge graph for topology and relationships.
-    
-    Raises:
-        RuntimeError: If graph search fails.
+    Queries the knowledge graph based on active domain configuration.
     """
-    slots = state.get("slots", SlotInfo())
+    # Handle legacy slots
+    slots = state.get("slots")
+    if isinstance(slots, SlotInfo):
+        slots = slots.to_dynamic()
+    elif slots is None:
+        slots = DynamicSlotInfo()
+        
     query = state.get("query", "")
+    current_domain = get_active_domain()
+    
+    if not current_domain:
+        print("[GraphSearch] Warning: No active domain found, skipping search.")
+        return {**state, "graph_results": []}
 
     results: List[RetrievalResult] = []
 
@@ -108,99 +117,62 @@ async def graph_search_node(state: GraphState) -> GraphState:
 
         if driver:
             async with driver.session() as session:
-                # Query 1: Find services and their relationships
-                service_hint = slots.service_name or ""
+                # Prepare query parameters
+                params = {"hint": query}
+                # Add all slots as parameters
+                params.update(slots.get_filled_slots())
+                
+                # Determine which Cypher query to run
+                # Default to primary_search
+                cypher = current_domain.graph_queries.primary_search
+                
+                # Simple heuristic: if specific intent matches a query type (future)
+                # For now, we rely on the primary search being robust enough
+                
+                if not cypher:
+                    print("[GraphSearch] Warning: No primary_search query defined for domain.")
+                    return {**state, "graph_results": []}
 
-                # If we have a service hint, search for it
-                if service_hint:
-                    cypher = """
-                    MATCH (s:Service)-[r]-(related)
-                    WHERE toLower(s.name) CONTAINS toLower($service_hint)
-                    RETURN s.name as service, s.version as version, 
-                           type(r) as relationship, 
-                           labels(related)[0] as related_type,
-                           related.name as related_name,
-                           properties(related) as related_props
-                    LIMIT 10
-                    """
-                else:
-                    # Default: get recent events and affected services
-                    cypher = """
-                    MATCH (e:Event)-[r:AFFECTS|TRIGGERED_BY]-(s:Service)
-                    RETURN e.event_id as event_id, e.description as description,
-                           e.severity as severity, e.timestamp as timestamp,
-                           type(r) as relationship, s.name as service,
-                           s.version as version
-                    ORDER BY e.timestamp DESC
-                    LIMIT 5
-                    """
-
-                result = await session.run(cypher, service_hint=service_hint)
+                result = await session.run(cypher, **params)
                 records = await result.data()
 
                 for record in records:
-                    if "event_id" in record:
-                        # Event result
-                        results.append(
-                            RetrievalResult(
-                                source="graph",
-                                title=f"Event: {record['event_id']}",
-                                content=f"{record['description']} (affects {record['service']})",
-                                metadata={
-                                    "event_id": record["event_id"],
-                                    "severity": record.get("severity"),
-                                    "timestamp": record.get("timestamp"),
-                                },
-                                confidence=0.90,
-                                raw_data=record,
-                            )
+                    # Construct title/content dynamically based on returned fields
+                    # We expect the query to return readable fields
+                    
+                    # Try to find a 'name' or 'subject' or 'title' for the result title
+                    title_candidates = ["subject", "name", "title", "id", "event_id"]
+                    title = "Graph Result"
+                    for key in title_candidates:
+                        if key in record:
+                            title = f"{key.title()}: {record[key]}"
+                            break
+                            
+                    # Everything else goes into content/metadata
+                    content_parts = []
+                    for k, v in record.items():
+                        if k not in title_candidates and v:
+                            if isinstance(v, list):
+                                v = ", ".join([str(i) for i in v])
+                            content_parts.append(f"{k}: {v}")
+                    
+                    content = "\n".join(content_parts)
+                    
+                    results.append(
+                        RetrievalResult(
+                            source="graph",
+                            title=title,
+                            content=content,
+                            metadata=record,
+                            confidence=0.85,  # Heuristic confidence
+                            raw_data=record,
                         )
-                    else:
-                        # Service relationship result
-                        results.append(
-                            RetrievalResult(
-                                source="graph",
-                                title=f"{record['service']} → {record['relationship']}",
-                                content=f"Related to {record['related_type']}: {record['related_name']}",
-                                metadata={
-                                    "service": record["service"],
-                                    "version": record.get("version"),
-                                    "relationship": record["relationship"],
-                                    "related_type": record.get("related_type"),
-                                },
-                                confidence=0.85,
-                                raw_data=record,
-                            )
-                        )
-
-                # Query 2: If searching for config issues
-                if (
-                    "config" in query.lower()
-                    or "pool" in query.lower()
-                    or "timeout" in query.lower()
-                ):
-                    config_cypher = """
-                    MATCH (c:Config)-[:CONFIGURES]->(s:Service)
-                    RETURN c.name as config_name, c.max_pool_size as max_pool_size,
-                           c.timeout_ms as timeout_ms, s.name as service
-                    """
-                    config_result = await session.run(config_cypher)
-                    config_records = await config_result.data()
-
-                    for record in config_records:
-                        results.append(
-                            RetrievalResult(
-                                source="graph",
-                                title=f"Config: {record['config_name']}",
-                                content=f"Service: {record['service']}, Pool Size: {record['max_pool_size']}, Timeout: {record['timeout_ms']}ms",
-                                metadata=record,
-                                confidence=0.88,
-                                raw_data=record,
-                            )
-                        )
+                    )
 
     except Exception as e:
-        raise RuntimeError(f"Graph search failed: {e}") from e
+        print(f"[GraphSearch] Error: {e}")
+        # Don't fail the whole workflow, just return empty results
+        # raise RuntimeError(f"Graph search failed: {e}") from e
 
     return {**state, "graph_results": results}
 
@@ -209,14 +181,18 @@ async def vector_search_node(state: GraphState) -> GraphState:
     """
     Vector Search Node (Qdrant)
 
-    Semantic search over document embeddings.
-    
-    Raises:
-        RuntimeError: If vector search fails.
+    Semantic search over document embeddings with dynamic filtering.
     """
     query = state.get("query", "")
-    slots = state.get("slots", SlotInfo())
+    
+    # Handle legacy slots
+    slots = state.get("slots")
+    if isinstance(slots, SlotInfo):
+        slots = slots.to_dynamic()
+    elif slots is None:
+        slots = DynamicSlotInfo()
 
+    current_domain = get_active_domain()
     results: List[RetrievalResult] = []
 
     try:
@@ -231,51 +207,60 @@ async def vector_search_node(state: GraphState) -> GraphState:
                 # Generate query embedding using LM Studio
                 query_vector = await get_embedding(query)
 
-                # Build filter based on slots
+                # Build filter based on domain config and slots
                 filter_conditions = []
-                if slots.service_name:
-                    filter_conditions.append(
-                        FieldCondition(
-                            key="service", match=MatchText(text=slots.service_name)
-                        )
-                    )
+                
+                if current_domain:
+                    filled_slots = slots.get_filled_slots()
+                    for field in current_domain.vector_filter_fields:
+                        if field in filled_slots:
+                             # Add filter condition
+                             # Assumes slot name matches Qdrant payload field name
+                            filter_conditions.append(
+                                FieldCondition(
+                                    key=field, 
+                                    match=MatchText(text=str(filled_slots[field]))
+                                )
+                            )
 
                 search_filter = (
                     Filter(must=filter_conditions) if filter_conditions else None
                 )
 
                 # Execute search using query_points (Qdrant client >= 1.10)
-                search_results = client.query_points(
-                    collection_name=settings.qdrant_collection,
-                    query=query_vector,
-                    limit=5,
-                    query_filter=search_filter,
-                )
-
-                for hit in search_results.points:
-                    results.append(
-                        RetrievalResult(
-                            source="vector",
-                            title=hit.payload.get("title", "Document"),
-                            content=hit.payload.get("content", "")[:300] + "...",
-                            metadata={
-                                "document_type": hit.payload.get("document_type", ""),
-                                "service": hit.payload.get("service", ""),
-                                "tags": hit.payload.get("tags", []),
-                            },
-                            confidence=float(hit.score),
-                            raw_data=hit.payload,
-                        )
+                try:
+                    search_results = client.query_points(
+                        collection_name=settings.qdrant_collection,
+                        query=query_vector,
+                        limit=5,
+                        query_filter=search_filter,
                     )
+
+                    for hit in search_results.points:
+                        results.append(
+                            RetrievalResult(
+                                source="vector",
+                                title=hit.payload.get("title", "Document"),
+                                content=hit.payload.get("content", "")[:300] + "...",
+                                metadata={
+                                    k: v for k, v in hit.payload.items() 
+                                    if k not in ["content", "title", "text"]
+                                },
+                                confidence=float(hit.score),
+                                raw_data=hit.payload,
+                            )
+                        )
+                except Exception as search_err:
+                    print(f"[VectorSearch] Query failed: {search_err}")
+                    
             else:
-                raise RuntimeError(
-                    f"Collection '{settings.qdrant_collection}' not found. Run init_db.py first."
-                )
+                 print(f"[VectorSearch] Collection '{settings.qdrant_collection}' not found.")
         else:
-            raise RuntimeError("Qdrant client not available")
+            print("[VectorSearch] Client not available")
 
     except Exception as e:
-        raise RuntimeError(f"Vector search failed: {e}") from e
+         print(f"[VectorSearch] Error: {e}")
+         # Don't fail the whole workflow
 
     return {**state, "vector_results": results}
 

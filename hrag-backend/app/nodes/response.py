@@ -1,11 +1,12 @@
 """
 Response Generation Node
-Formats the final response for the user
+Formats the final response for the user based on active domain.
 """
 
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_openai import ChatOpenAI
 
+from app.domain_init import get_active_domain
 from app.state import DiagnosticResponse, GraphState, Message
 from config import settings
 
@@ -21,84 +22,60 @@ def get_llm():
 
 
 # =============================================================================
-# CHAT_RESPONSE_PROMPT - Conversational Response Generation
-# Anthropic 10-Element Framework Applied
+# Dynamic Prompt Generation
 # =============================================================================
-CHAT_RESPONSE_PROMPT = ChatPromptTemplate.from_messages(
-    [
-        (
-            "system",
-            """<!-- 1. Task Context -->
-You are DevOps Copilot, a friendly and professional AI assistant created by the Platform Engineering team.
-Your primary mission is to help users investigate DevOps incidents, but you also engage in general conversation
-when users want to chat, ask about your capabilities, or need guidance on how to use the system.
+
+
+def _get_chat_prompt(domain_config) -> ChatPromptTemplate:
+    """Generate chat response prompt based on domain config."""
+    
+    system_prompt = f"""<!-- 1. Task Context -->
+{domain_config.chat_turn_prompt.system_identity or "You are a helpful assistant."}
 
 <!-- 2. Tone Context -->
 Be warm, helpful, and approachable while maintaining professionalism.
-Use a conversational but efficient tone - friendly without being overly casual.
-Match the user's language (Traditional Chinese 繁體中文 if they write in Chinese, English otherwise).
-Keep responses concise but complete (typically 2-4 sentences for greetings, more for explanations).
+Match the user's language ({domain_config.response_language} if they write in that language, otherwise generic).
+Keep responses concise but complete.
 
 <!-- 4. Detailed Task Description & Rules -->
 RULES:
 1. For greetings: Respond warmly and briefly mention your capabilities
 2. For capability questions: Explain what you can do clearly and offer to help
-3. For unclear requests: Gently guide the user toward describing their DevOps issue
+3. For unclear requests: Gently guide the user toward describling their issue related to {domain_config.display_name}
 4. NEVER pretend to have capabilities you don't have
-5. NEVER discuss topics unrelated to DevOps, technology, or your assistant role
+5. NEVER discuss topics unrelated to your role
 6. If asked about sensitive topics, politely redirect to your core function
 
 CAPABILITIES you can mention:
-- Investigate production incidents and errors
-- Analyze logs and error patterns
-- Query knowledge base of past incidents
-- Trace service dependencies and topology
-- Provide root cause analysis and recommendations
-
-<!-- 5. Examples -->
-<examples>
-  <example>
-    <user_input>你好</user_input>
-    <response>你好！我是 DevOps Copilot，專門協助調查生產環境事件與排除故障。您可以描述遇到的問題，例如服務錯誤、效能異常或系統告警，我會幫您診斷！</response>
-  </example>
-  <example>
-    <user_input>What can you do?</user_input>
-    <response>I'm your DevOps incident investigation assistant! I can help you:
-• Diagnose production errors and service issues
-• Analyze logs and trace error patterns
-• Search our knowledge base for similar past incidents
-• Provide root cause analysis with actionable recommendations
-
-Just describe the issue you're seeing, and I'll help investigate!</response>
-  </example>
-  <example>
-    <user_input>請問你是誰開發的？</user_input>
-    <response>我是由 Platform Engineering 團隊開發的 DevOps Copilot。我的設計目標是幫助您快速診斷生產環境問題、分析事件根因，並提供解決建議。有什麼我可以幫您調查的嗎？</response>
-  </example>
-</examples>""",
-        ),
-        (
-            "human",
-            """<!-- 7. Immediate Task -->
-<input>{query}</input>""",
-        ),
-    ]
-)
+- {domain_config.display_name} specific tasks
+- {", ".join(domain_config.intents)} related activities
+"""
+    return ChatPromptTemplate.from_messages([
+        ("system", system_prompt),
+        ("human", "<input>{query}</input>"),
+    ])
 
 
 async def chat_response_node(state: GraphState) -> GraphState:
     """
-    Generate response for chat/greeting messages using LLM
-    
-    Raises:
-        RuntimeError: If LLM response generation fails.
+    Generate response for chat/greeting messages using LLM.
     """
     query = state.get("query", "")
+    current_domain = get_active_domain()
+    
+    if not current_domain:
+        return {**state, "response": "System error: Domain not initialized."}
 
     llm = get_llm()
-    chat_chain = CHAT_RESPONSE_PROMPT | llm
-    result = await chat_chain.ainvoke({"query": query})
-    response = result.content.strip()
+    chat_prompt = _get_chat_prompt(current_domain)
+    chat_chain = chat_prompt | llm
+    
+    try:
+        result = await chat_chain.ainvoke({"query": query})
+        response = result.content.strip()
+    except Exception as e:
+        print(f"[ChatResponse] generation error: {e}")
+        response = "I'm having trouble generating a response right now. Please try again."
 
     return {**state, "response": response}
 
@@ -117,12 +94,14 @@ async def diagnostic_response_node(state: GraphState) -> GraphState:
     Format diagnostic response for presentation
     """
     diagnostic = state.get("diagnostic")
-    reasoning_steps = state.get("reasoning_steps", [])
+    
+    current_domain = get_active_domain()
+    lang = current_domain.response_language if current_domain else "English"
 
     if not diagnostic:
         return {
             **state,
-            "response": "Unable to generate diagnostic analysis. Please provide more details.",
+            "response": "Unable to generate analysis. Please provide more details.",
         }
 
     # Build formatted response
@@ -130,9 +109,13 @@ async def diagnostic_response_node(state: GraphState) -> GraphState:
 
     # Add reasoning summary
     response_parts.append("## Analysis Complete\n")
-    response_parts.append(f"根據混合檢索與日誌分析，發現潛在根因。\n")
+    if "Chinese" in lang or "中文" in lang:
+        response_parts.append(f"根據混合檢索與分析，發現以下結果。\n")
+    else:
+        response_parts.append(f"Based on hybrid retrieval and analysis, here are the findings.\n")
 
     # Response will be enhanced by the diagnostic card in frontend
+    # backend just sends the text wrapper
     response = "\n".join(response_parts)
 
     return {**state, "response": response}
@@ -142,7 +125,10 @@ async def end_conversation_node(state: GraphState) -> GraphState:
     """
     Handle conversation end
     """
+    current_domain = get_active_domain()
+    name = current_domain.display_name if current_domain else "the system"
+    
     return {
         **state,
-        "response": "Thank you for using DevOps Copilot. The conversation has ended. Feel free to start a new conversation anytime!",
+        "response": f"Thank you for using {name}. The conversation has ended. Feel free to start a new conversation anytime!",
     }
