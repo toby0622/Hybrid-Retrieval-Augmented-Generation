@@ -129,6 +129,21 @@ app.add_middleware(
 gardener_tasks: dict = {}
 
 
+# --- Startup Event ---
+
+@app.on_event("startup")
+async def startup_event():
+    """Initialize domain system on startup."""
+    from app.domain_init import initialize_domain_system
+    
+    print("[Startup] Initializing domain system...")
+    try:
+        config = initialize_domain_system()
+        print(f"[Startup] Active domain: {config.display_name}")
+    except Exception as e:
+        print(f"[Startup] Domain initialization error: {e}")
+
+
 # --- Endpoints ---
 
 

@@ -175,9 +175,9 @@ def _get_slot_extraction_prompt(domain_config) -> ChatPromptTemplate:
         
     slots_xml += "</slot_schema>"
     
-    # Generate JSON schema example
-    schema_dict = {s: "string|null" for s in domain_config.slots.required + domain_config.slots.optional}
-    schema_str = json.dumps(schema_dict).replace('"', "'")
+    # Generate JSON schema example - escape curly braces for LangChain template
+    schema_fields = [f'"{s}": "string|null"' for s in domain_config.slots.required + domain_config.slots.optional]
+    schema_str = "{{" + ", ".join(schema_fields) + "}}"
 
     system_prompt = f"""<!-- 1. Task Context -->
 You are SlotExtractor. Your responsibility is to extract structured information from user queries.
@@ -242,6 +242,7 @@ async def input_guard_node(state: GraphState) -> GraphState:
     try:
         result = await classification_chain.ainvoke({"query": query})
         intent_raw = result.content.strip().lower()
+        print(f"[InputGuard] LLM intent response: '{intent_raw}'")
     except Exception as e:
         print(f"[InputGuard] Classification error: {e}")
         intent_raw = "chat"  # Fallback
@@ -250,6 +251,7 @@ async def input_guard_node(state: GraphState) -> GraphState:
     valid_intents = current_domain.intents
     # Simple fuzzy matching
     matched_intent = next((i for i in valid_intents if i in intent_raw), "chat")
+    print(f"[InputGuard] Matched intent: '{matched_intent}' from valid: {valid_intents}")
     
     # Step 2: Slot Extraction (if intent is not chat/end)
     # Check if this intent requires slot filling (usually non-chat/end intents)
@@ -268,6 +270,7 @@ async def input_guard_node(state: GraphState) -> GraphState:
         try:
             result = await extraction_chain.ainvoke({"query": query})
             content = result.content.strip()
+            print(f"[InputGuard] Slot extraction raw: '{content[:200]}'")
             
             # Handle prefill and markdown
             if not content.startswith("{"):
@@ -278,6 +281,7 @@ async def input_guard_node(state: GraphState) -> GraphState:
                     content = content[4:]
             
             slot_data = json.loads(content)
+            print(f"[InputGuard] Extracted slots: {slot_data}")
             
             # Populate DynamicSlotInfo
             for key, value in slot_data.items():
