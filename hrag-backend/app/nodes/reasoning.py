@@ -20,7 +20,7 @@ def get_llm():
         base_url=settings.llm_base_url,
         api_key=settings.llm_api_key,
         model=settings.llm_model_name,
-        temperature=0.2,
+        temperature=0.5,
     )
 
 

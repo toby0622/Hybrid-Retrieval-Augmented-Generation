@@ -87,7 +87,7 @@ function DiagnosticNode({ step, isRoot = false, onClick, isExpanded }: Diagnosti
                 <Terminal className="w-3 h-3" /> Raw Evidence
               </div>
               <div className="font-mono text-[10px] leading-relaxed bg-black/60 p-2.5 rounded border border-slate-800/60 text-slate-300 overflow-x-auto whitespace-pre-wrap max-h-48 scrollbar-thin scrollbar-thumb-slate-700">
-                {step.raw_content?.type === 'graph' 
+                {typeof step.raw_content?.data === 'object' 
                   ? JSON.stringify(step.raw_content.data, null, 2) 
                   : String(step.raw_content?.data || '')}
               </div>

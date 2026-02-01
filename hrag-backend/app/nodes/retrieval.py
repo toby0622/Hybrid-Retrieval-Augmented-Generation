@@ -48,6 +48,10 @@ Your task is to generate a Cypher query to answer the user's question based on t
 3. Use case-insensitive string matching for properties (e.g. `toLower(n.name) CONTAINS toLower('value')`).
 4. Limit results to 20 unless specified otherwise.
 5. Return readable properties to help user understand the context.
+
+# Directionality Hints
+- **Impact Analysis** (e.g., "What happens if X fails?"): Look for incoming DEPENDS_ON relationships. `MATCH (affected:Service)-[:DEPENDS_ON]->(root:Service {{name: 'X'}}) RETURN affected`
+- **Dependency Check** (e.g., "What does X depend on?"): Look for outgoing DEPENDS_ON relationships. `MATCH (source:Service {{name: 'X'}})-[:DEPENDS_ON]->(dep:Service) RETURN dep`
 """
 
     prompt = ChatPromptTemplate.from_messages([
