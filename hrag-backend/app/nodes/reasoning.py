@@ -184,8 +184,13 @@ async def reasoning_node(state: GraphState) -> GraphState:
         print(f"[Reasoning] LLM error: {e}")
         llm_analysis = f"Analysis error: {e}"
 
-    # Build diagnostic path dynamically from LLM output
-    diagnostic = _parse_diagnostic_response(llm_analysis, query)
+    # Build diagnostic path dynamically from LLM output + retrieval results
+    diagnostic = _parse_diagnostic_response(
+        llm_analysis, 
+        query, 
+        graph_results=graph_results,
+        vector_results=vector_results
+    )
 
     return {
         **state,
@@ -195,25 +200,94 @@ async def reasoning_node(state: GraphState) -> GraphState:
     }
 
 
-def _format_results(results: List[RetrievalResult]) -> str:
+def _format_results(results: List[dict]) -> str:
     """Format retrieval results into readable text"""
     if not results:
         return ""
 
     parts = []
     for r in results:
-        parts.append(f"**{r.title}** (confidence: {r.confidence:.2f})\n{r.content}")
+        title = r.get("title", "Unknown")
+        confidence = r.get("confidence", 0.0)
+        content = r.get("content", "")
+        parts.append(f"**{title}** (confidence: {confidence:.2f})\n{content}")
     return "\n\n".join(parts)
 
 
-def _parse_diagnostic_response(llm_output: str, query: str) -> DiagnosticResponse:
+def _parse_diagnostic_response(
+    llm_output: str, 
+    query: str,
+    graph_results: List[dict] = None,
+    vector_results: List[dict] = None
+) -> DiagnosticResponse:
     """
     Parse the XML output from the LLM into a structured DiagnosticResponse.
-    Robustly handles malformed XML using regex.
+    Also includes graph and vector search results.
     """
     steps = []
+    graph_results = graph_results or []
+    vector_results = vector_results or []
     
-    # Extract root cause / conclusion
+    # Add Graph Search results first
+    if graph_results:
+        graph_summary_parts = []
+        for r in graph_results[:5]:
+            title = r.get("title", "Graph Result")
+            content = r.get("content", "")
+            summary = f"• {title}: {content[:80]}..." if len(content) > 80 else f"• {title}: {content}"
+            graph_summary_parts.append(summary)
+            
+        graph_summary = "\n".join(graph_summary_parts)
+        
+        steps.append(DiagnosticStep(
+            id="graph",
+            source="Graph Search",
+            title=f"Knowledge Graph ({len(graph_results)} results)",
+            detail=graph_summary,
+            status="info",
+            is_parallel=True,
+            raw_content={"type": "graph", "data": [{"title": r.get("title"), "content": r.get("content")} for r in graph_results]},
+        ))
+    else:
+        steps.append(DiagnosticStep(
+            id="graph",
+            source="Graph Search",
+            title="Knowledge Graph (0 results)",
+            detail="No graph results found for this query.",
+            status="warning",
+            is_parallel=True,
+        ))
+    
+    # Add Vector Search results
+    if vector_results:
+        vector_summary_parts = []
+        for r in vector_results[:5]:
+            title = r.get("title", "Document")
+            confidence = r.get("confidence", 0.0)
+            vector_summary_parts.append(f"• {title} (score: {confidence:.2f})")
+            
+        vector_summary = "\n".join(vector_summary_parts)
+        
+        steps.append(DiagnosticStep(
+            id="vector",
+            source="Vector Search",
+            title=f"Semantic Search ({len(vector_results)} matches)",
+            detail=vector_summary,
+            status="info",
+            is_parallel=True,
+            raw_content={"type": "log", "data": [{"title": r.get("title"), "content": r.get("content"), "score": r.get("confidence")} for r in vector_results]},
+        ))
+    else:
+        steps.append(DiagnosticStep(
+            id="vector",
+            source="Vector Search",
+            title="Semantic Search (0 matches)",
+            detail="No relevant documents found.",
+            status="warning",
+            is_parallel=True,
+        ))
+    
+    # Extract root cause / conclusion from LLM
     root_cause_match = re.search(r"<root_cause[^>]*>(.*?)</root_cause>", llm_output, re.DOTALL)
     root_cause = root_cause_match.group(1).strip() if root_cause_match else "Analysis incomplete"
     
@@ -225,7 +299,7 @@ def _parse_diagnostic_response(llm_output: str, query: str) -> DiagnosticRespons
     recommendations = re.findall(r"<action[^>]*>(.*?)</action>", llm_output, re.DOTALL)
     suggestion = recommendations[0].strip() if recommendations else "No specific recommendation."
     
-    # Create diagnostic steps based on findings
+    # Add LLM Analysis step
     steps.append(DiagnosticStep(
         id="result",
         source="LLM Analysis",
@@ -233,16 +307,8 @@ def _parse_diagnostic_response(llm_output: str, query: str) -> DiagnosticRespons
         detail=root_cause,
         status="info",
         is_root=True,
+        raw_content={"type": "markdown", "data": evidence} if evidence else None,
     ))
-    
-    if evidence:
-        steps.append(DiagnosticStep(
-            id="evidence",
-            source="Evidence",
-            title="Supporting Data",
-            detail=evidence[:100] + "..." if len(evidence) > 100 else evidence,
-            status="info",
-        ))
 
     return DiagnosticResponse(
         path=steps,

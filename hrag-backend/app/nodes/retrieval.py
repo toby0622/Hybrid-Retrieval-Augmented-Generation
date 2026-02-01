@@ -4,7 +4,7 @@ Graph search (Neo4j) + Vector search (Qdrant)
 """
 
 import asyncio
-from typing import List, Optional
+from typing import List, Optional, Any
 
 import httpx
 from neo4j import AsyncGraphDatabase
@@ -220,14 +220,14 @@ async def graph_search_node(state: GraphState) -> GraphState:
                     content = "\n".join(content_parts)
                     
                     results.append(
-                        RetrievalResult(
+                        _make_serializable(RetrievalResult(
                             source="graph",
                             title=title,
                             content=content,
                             metadata=record,
                             confidence=0.85,  # Heuristic confidence
                             raw_data=record,
-                        )
+                        ).model_dump())
                     )
 
     except Exception as e:
@@ -236,6 +236,20 @@ async def graph_search_node(state: GraphState) -> GraphState:
         # raise RuntimeError(f"Graph search failed: {e}") from e
 
     return {**state, "graph_results": results}
+
+
+def _make_serializable(obj: Any) -> Any:
+    """Recursively convert Neo4j types (DateTime, etc.) to strings."""
+    from neo4j.time import DateTime, Date, Time, Duration
+    
+    if isinstance(obj, dict):
+        return {k: _make_serializable(v) for k, v in obj.items()}
+    elif isinstance(obj, list):
+        return [_make_serializable(v) for v in obj]
+    elif isinstance(obj, (DateTime, Date, Time, Duration)):
+        return str(obj)
+    else:
+        return obj
 
 
 async def vector_search_node(state: GraphState) -> GraphState:
@@ -299,7 +313,7 @@ async def vector_search_node(state: GraphState) -> GraphState:
 
                     for hit in search_results.points:
                         results.append(
-                            RetrievalResult(
+                            _make_serializable(RetrievalResult(
                                 source="vector",
                                 title=hit.payload.get("title", "Document"),
                                 content=hit.payload.get("content", "")[:300] + "...",
@@ -309,7 +323,7 @@ async def vector_search_node(state: GraphState) -> GraphState:
                                 },
                                 confidence=float(hit.score),
                                 raw_data=hit.payload,
-                            )
+                            ).model_dump())
                         )
                 except Exception as search_err:
                     print(f"[VectorSearch] Query failed: {search_err}")
