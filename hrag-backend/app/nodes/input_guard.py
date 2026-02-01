@@ -4,12 +4,13 @@ Routes user input based on dynamic domain intent classification.
 """
 
 import json
-from typing import Literal
+from typing import Literal, Optional
 
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_openai import ChatOpenAI
 
-from app.domain_init import get_active_domain
+from app.domain_config import DomainRegistry
+from app.domain_init import get_active_domain, switch_domain, list_available_domains
 from app.state import DynamicSlotInfo, GraphState, SlotInfo
 from config import settings
 
@@ -22,6 +23,90 @@ def get_llm():
         model=settings.llm_model_name,
         temperature=0.1,
     )
+
+
+# =============================================================================
+# Domain Auto-Detection (LLM-based)
+# =============================================================================
+
+
+def _get_domain_routing_prompt(domains: list) -> ChatPromptTemplate:
+    """Generate domain routing prompt for LLM classification."""
+    
+    # Build domain descriptions from configs
+    domain_descriptions = []
+    for domain_name in domains:
+        config = DomainRegistry.get_domain(domain_name)
+        if config:
+            keywords_sample = config.routing_keywords[:10] if config.routing_keywords else []
+            keywords_str = ", ".join(str(k) for k in keywords_sample)
+            domain_descriptions.append(
+                f'<domain name="{domain_name}">\n'
+                f'  Display: {config.display_name}\n'
+                f'  Description: {config.description}\n'
+                f'  Keywords: {keywords_str}\n'
+                f'</domain>'
+            )
+    
+    domains_xml = "\n".join(domain_descriptions)
+    domain_names = ", ".join(domains)
+    
+    system_prompt = f"""You are DomainRouter. Your task is to classify which domain should handle the user's query.
+
+<available_domains>
+{domains_xml}
+</available_domains>
+
+RULES:
+1. Output ONLY the domain name: {domain_names}
+2. Choose the domain that best matches the user's query topic
+3. If unsure, pick the most likely domain based on context
+4. No explanation, just the domain name"""
+
+    return ChatPromptTemplate.from_messages([
+        ("system", system_prompt),
+        ("human", "<query>{query}</query>"),
+    ])
+
+
+async def _detect_domain_async(query: str) -> Optional[str]:
+    """
+    Detect which domain should handle this query using LLM.
+    
+    Uses semantic understanding to classify the query into the appropriate domain.
+    Returns the domain name, or None if detection fails.
+    """
+    available_domains = list_available_domains()
+    
+    if not available_domains:
+        return None
+    
+    # If only one domain, use it directly (no LLM call needed)
+    if len(available_domains) == 1:
+        return available_domains[0]
+    
+    # Use LLM to classify domain
+    llm = get_llm()
+    prompt = _get_domain_routing_prompt(available_domains)
+    chain = prompt | llm
+    
+    try:
+        result = await chain.ainvoke({"query": query})
+        detected = result.content.strip().lower()
+        
+        # Match to valid domain name
+        for domain_name in available_domains:
+            if domain_name.lower() in detected:
+                print(f"[DomainRouter] LLM detected domain: {domain_name}")
+                return domain_name
+        
+        # Fallback to first domain if no match
+        print(f"[DomainRouter] LLM response '{detected}' not matched, using first domain")
+        return available_domains[0]
+        
+    except Exception as e:
+        print(f"[DomainRouter] LLM error: {e}, using first domain")
+        return available_domains[0]
 
 
 # =============================================================================
@@ -127,10 +212,17 @@ async def input_guard_node(state: GraphState) -> GraphState:
     """
     Input Guardrails Node
 
+    0. Auto-detects domain based on query content
     1. Classifies user intent based on active domain
     2. For queries needing slots, extracts them dynamically
     """
     query = state.get("query", "")
+    
+    # Step 0: Auto-detect domain based on query content (LLM-based)
+    detected_domain = await _detect_domain_async(query)
+    if detected_domain:
+        switch_domain(detected_domain)
+    
     current_domain = get_active_domain()
     
     if not current_domain:

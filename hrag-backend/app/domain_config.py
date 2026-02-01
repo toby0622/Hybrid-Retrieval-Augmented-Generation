@@ -66,6 +66,9 @@ class DomainConfig:
     graph_queries: QueryConfig = field(default_factory=QueryConfig)
     vector_filter_fields: List[str] = field(default_factory=list)
     
+    # Domain routing (for auto-detection)
+    routing_keywords: List[str] = field(default_factory=list)
+    
     # Response formatting
     response_language: str = "zh-TW"
 
@@ -119,6 +122,7 @@ class DomainConfig:
             chat_prompt=parse_prompt(data.get("chat_prompt", {})),
             graph_queries=queries,
             vector_filter_fields=data.get("vector_filter_fields", []),
+            routing_keywords=data.get("routing_keywords", []),
             response_language=data.get("response_language", "zh-TW"),
         )
 

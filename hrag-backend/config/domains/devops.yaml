@@ -6,6 +6,42 @@ display_name: "DevOps Copilot"
 description: "AI SRE for incident investigation and root cause analysis"
 schema: devops  # References devops_schema.py
 
+# Keywords for auto-detecting this domain from user queries
+routing_keywords:
+  - error
+  - 錯誤
+  - service
+  - 服務
+  - incident
+  - 事件
+  - outage
+  - 宕機
+  - latency
+  - 延遲
+  - timeout
+  - 超時
+  - crash
+  - deployment
+  - 部署
+  - kubernetes
+  - k8s
+  - pod
+  - container
+  - 容器
+  - cpu
+  - memory
+  - 記憶體
+  - log
+  - 日誌
+  - metric
+  - 指標
+  - alert
+  - 告警
+  - sev1
+  - sev2
+  - production
+  - 生產環境
+
 # Intent classification
 intents:
   - incident    # Investigating an outage or error
