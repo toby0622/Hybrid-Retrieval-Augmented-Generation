@@ -3,15 +3,14 @@ import json
 import uuid
 from typing import AsyncGenerator, List, Optional
 
-from fastapi import BackgroundTasks, FastAPI, File, HTTPException, UploadFile
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse
-from pydantic import BaseModel, Field
-
 from app.graph import graph, run_query
 from app.nodes.feedback import check_entity_conflicts, extract_entities_node
 from app.state import DiagnosticResponse, DiagnosticStep, SlotInfo
 from config import settings
+from fastapi import BackgroundTasks, FastAPI, File, HTTPException, UploadFile
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
+from pydantic import BaseModel, Field
 
 
 class ChatRequest(BaseModel):
@@ -103,7 +102,7 @@ gardener_tasks: dict = {}
 @app.on_event("startup")
 async def startup_event():
     from app.domain_init import initialize_domain_system
-    
+
     print("[Startup] Initializing domain system...")
     try:
         config = initialize_domain_system()
@@ -350,16 +349,16 @@ async def ingest_document_endpoint(
 ):
     try:
         from app.ingestion import ingest_document
-        
+
         content = await file.read()
         content_str = content.decode("utf-8")
-        
+
         result = await ingest_document(
             content=content_str,
             filename=file.filename,
             doc_type=doc_type,
         )
-        
+
         return IngestResponse(
             file_name=file.filename,
             domain=result.domain,
@@ -369,7 +368,7 @@ async def ingest_document_endpoint(
             vectors_created=result.vectors_created,
             errors=result.errors,
         )
-        
+
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Ingestion error: {str(e)}")
 

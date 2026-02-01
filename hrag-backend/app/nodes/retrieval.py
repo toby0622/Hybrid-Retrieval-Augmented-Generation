@@ -1,17 +1,16 @@
 import asyncio
-from typing import List, Optional, Any
+from typing import Any, List, Optional
 
 import httpx
+from app.domain_init import get_active_domain
+from app.schema_registry import SchemaRegistry
+from app.state import DynamicSlotInfo, GraphState, RetrievalResult, SlotInfo
+from config import settings
+from langchain_core.prompts import ChatPromptTemplate
+from langchain_openai import ChatOpenAI
 from neo4j import AsyncGraphDatabase
 from qdrant_client import QdrantClient
 from qdrant_client.models import FieldCondition, Filter, MatchText
-
-from app.domain_init import get_active_domain
-from app.state import DynamicSlotInfo, GraphState, RetrievalResult, SlotInfo
-from app.schema_registry import SchemaRegistry
-from langchain_core.prompts import ChatPromptTemplate
-from langchain_openai import ChatOpenAI
-from config import settings
 
 EMBEDDING_DIM = 768
 
@@ -25,9 +24,11 @@ def get_llm():
     )
 
 
-async def generate_cypher_query(query: str, schema_str: str, slots: DynamicSlotInfo) -> str:
+async def generate_cypher_query(
+    query: str, schema_str: str, slots: DynamicSlotInfo
+) -> str:
     llm = get_llm()
-    
+
     system_prompt = """You are a Neo4j Cypher expert.
 Your task is to generate a Cypher query to answer the user's question based on the provided Graph Schema.
 
@@ -46,19 +47,19 @@ Your task is to generate a Cypher query to answer the user's question based on t
 - **Dependency Check** (e.g., "What does X depend on?"): Look for outgoing DEPENDS_ON relationships. `MATCH (source:Service {{name: 'X'}})-[:DEPENDS_ON]->(dep:Service) RETURN dep`
 """
 
-    prompt = ChatPromptTemplate.from_messages([
-        ("system", system_prompt),
-        ("human", "User Query: {query}\n\nExtracted Slots: {slots}"),
-    ])
-    
+    prompt = ChatPromptTemplate.from_messages(
+        [
+            ("system", system_prompt),
+            ("human", "User Query: {query}\n\nExtracted Slots: {slots}"),
+        ]
+    )
+
     chain = prompt | llm
-    
-    response = await chain.ainvoke({
-        "schema": schema_str,
-        "query": query,
-        "slots": slots.to_display_string()
-    })
-    
+
+    response = await chain.ainvoke(
+        {"schema": schema_str, "query": query, "slots": slots.to_display_string()}
+    )
+
     cypher = response.content.replace("```cypher", "").replace("```", "").strip()
     return cypher
 
@@ -123,10 +124,10 @@ async def graph_search_node(state: GraphState) -> GraphState:
         slots = slots.to_dynamic()
     elif slots is None:
         slots = DynamicSlotInfo()
-        
+
     query = state.get("query", "")
     current_domain = get_active_domain()
-    
+
     if not current_domain:
         return {**state, "graph_results": []}
 
@@ -139,20 +140,22 @@ async def graph_search_node(state: GraphState) -> GraphState:
             async with driver.session() as session:
                 params = {"hint": query}
                 params.update(slots.get_filled_slots())
-                
+
                 cypher = ""
-                
+
                 if current_domain.schema_name:
                     schema = SchemaRegistry.get_schema(current_domain.schema_name)
                     if schema and schema.extraction_prompt:
                         try:
-                            cypher = await generate_cypher_query(query, schema.extraction_prompt, slots)
+                            cypher = await generate_cypher_query(
+                                query, schema.extraction_prompt, slots
+                            )
                         except Exception as gen_err:
-                             pass
-                
+                            pass
+
                 if not cypher:
-                     cypher = current_domain.graph_queries.primary_search
-                
+                    cypher = current_domain.graph_queries.primary_search
+
                 if not cypher:
                     return {**state, "graph_results": []}
 
@@ -166,25 +169,27 @@ async def graph_search_node(state: GraphState) -> GraphState:
                         if key in record:
                             title = f"{key.title()}: {record[key]}"
                             break
-                            
+
                     content_parts = []
                     for k, v in record.items():
                         if k not in title_candidates and v:
                             if isinstance(v, list):
                                 v = ", ".join([str(i) for i in v])
                             content_parts.append(f"{k}: {v}")
-                    
+
                     content = "\n".join(content_parts)
-                    
+
                     results.append(
-                        _make_serializable(RetrievalResult(
-                            source="graph",
-                            title=title,
-                            content=content,
-                            metadata=record,
-                            confidence=0.85,
-                            raw_data=record,
-                        ).model_dump())
+                        _make_serializable(
+                            RetrievalResult(
+                                source="graph",
+                                title=title,
+                                content=content,
+                                metadata=record,
+                                confidence=0.85,
+                                raw_data=record,
+                            ).model_dump()
+                        )
                     )
 
     except Exception as e:
@@ -194,8 +199,8 @@ async def graph_search_node(state: GraphState) -> GraphState:
 
 
 def _make_serializable(obj: Any) -> Any:
-    from neo4j.time import DateTime, Date, Time, Duration
-    
+    from neo4j.time import Date, DateTime, Duration, Time
+
     if isinstance(obj, dict):
         return {k: _make_serializable(v) for k, v in obj.items()}
     elif isinstance(obj, list):
@@ -208,7 +213,7 @@ def _make_serializable(obj: Any) -> Any:
 
 async def vector_search_node(state: GraphState) -> GraphState:
     query = state.get("query", "")
-    
+
     slots = state.get("slots")
     if isinstance(slots, SlotInfo):
         slots = slots.to_dynamic()
@@ -229,15 +234,15 @@ async def vector_search_node(state: GraphState) -> GraphState:
                 query_vector = await get_embedding(query)
 
                 filter_conditions = []
-                
+
                 if current_domain:
                     filled_slots = slots.get_filled_slots()
                     for field in current_domain.vector_filter_fields:
                         if field in filled_slots:
                             filter_conditions.append(
                                 FieldCondition(
-                                    key=field, 
-                                    match=MatchText(text=str(filled_slots[field]))
+                                    key=field,
+                                    match=MatchText(text=str(filled_slots[field])),
                                 )
                             )
 
@@ -255,28 +260,32 @@ async def vector_search_node(state: GraphState) -> GraphState:
 
                     for hit in search_results.points:
                         results.append(
-                            _make_serializable(RetrievalResult(
-                                source="vector",
-                                title=hit.payload.get("title", "Document"),
-                                content=hit.payload.get("content", "")[:300] + "...",
-                                metadata={
-                                    k: v for k, v in hit.payload.items() 
-                                    if k not in ["content", "title", "text"]
-                                },
-                                confidence=float(hit.score),
-                                raw_data=hit.payload,
-                            ).model_dump())
+                            _make_serializable(
+                                RetrievalResult(
+                                    source="vector",
+                                    title=hit.payload.get("title", "Document"),
+                                    content=hit.payload.get("content", "")[:300]
+                                    + "...",
+                                    metadata={
+                                        k: v
+                                        for k, v in hit.payload.items()
+                                        if k not in ["content", "title", "text"]
+                                    },
+                                    confidence=float(hit.score),
+                                    raw_data=hit.payload,
+                                ).model_dump()
+                            )
                         )
                 except Exception as search_err:
                     pass
-                    
+
             else:
-                 pass
+                pass
         else:
             pass
 
     except Exception as e:
-         pass
+        pass
 
     return {**state, "vector_results": results}
 

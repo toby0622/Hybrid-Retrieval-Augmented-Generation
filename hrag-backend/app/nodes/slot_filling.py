@@ -1,9 +1,8 @@
-from langchain_core.prompts import ChatPromptTemplate
-from langchain_openai import ChatOpenAI
-
 from app.domain_init import get_active_domain
 from app.state import DynamicSlotInfo, GraphState, SlotInfo
 from config import settings
+from langchain_core.prompts import ChatPromptTemplate
+from langchain_openai import ChatOpenAI
 
 
 def get_llm():
@@ -39,7 +38,9 @@ def _get_clarification_prompt(domain_config) -> ChatPromptTemplate:
     priority_list = ""
     for i, slot in enumerate(domain_config.slots.required, 1):
         priority_list += f"{i}. {slot} (REQUIRED)\n"
-    for i, slot in enumerate(domain_config.slots.optional, len(domain_config.slots.required) + 1):
+    for i, slot in enumerate(
+        domain_config.slots.optional, len(domain_config.slots.required) + 1
+    ):
         priority_list += f"{i}. {slot} (OPTIONAL)\n"
 
     system_prompt = f"""<!-- 1. Task Context -->
@@ -76,10 +77,15 @@ RULES:
 Output: A single clarification question in {domain_config.response_language}.
 Do not include any prefixes, labels, or explanations - just the question itself."""
 
-    return ChatPromptTemplate.from_messages([
-        ("system", system_prompt),
-        ("human", "Based on the context provided, generate the most appropriate clarification question."),
-    ])
+    return ChatPromptTemplate.from_messages(
+        [
+            ("system", system_prompt),
+            (
+                "human",
+                "Based on the context provided, generate the most appropriate clarification question.",
+            ),
+        ]
+    )
 
 
 MAX_CLARIFICATION_ROUNDS = 3
@@ -94,14 +100,13 @@ async def slot_check_node(state: GraphState) -> GraphState:
 
     query = state.get("query", "")
     clarification_count = state.get("clarification_count", 0)
-    
+
     current_domain = get_active_domain()
     if not current_domain:
         return {**state, "clarification_question": None}
 
     slots.configure(
-        required=current_domain.slots.required,
-        optional=current_domain.slots.optional
+        required=current_domain.slots.required, optional=current_domain.slots.optional
     )
 
     if slots.is_sufficient() or clarification_count >= MAX_CLARIFICATION_ROUNDS:
@@ -120,7 +125,7 @@ async def slot_check_node(state: GraphState) -> GraphState:
     llm = get_llm()
     prompt = _get_clarification_prompt(current_domain)
     chain = prompt | llm
-    
+
     try:
         result = await chain.ainvoke(
             {

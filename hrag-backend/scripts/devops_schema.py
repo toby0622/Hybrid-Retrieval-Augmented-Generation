@@ -2,7 +2,9 @@ from dataclasses import dataclass, field
 from typing import Dict, List, Optional
 
 SCHEMA_NAME = "DevOps Incident Management"
-SCHEMA_DESCRIPTION = "Schema for DevOps infrastructure: services, incidents, metrics, and logs"
+SCHEMA_DESCRIPTION = (
+    "Schema for DevOps infrastructure: services, incidents, metrics, and logs"
+)
 
 
 @dataclass
@@ -45,7 +47,7 @@ ENTITY_SCHEMAS = {
             "Look for service names in error messages",
             "Check for microservice naming patterns like xxx-service, xxx-api",
             "Common services: auth, user, payment, notification, gateway",
-        ]
+        ],
     ),
     "Incident": Entity(
         name="Incident",
@@ -65,7 +67,7 @@ ENTITY_SCHEMAS = {
             "Look for severity indicators like SEV1, P0, critical",
             "Check for incident IDs starting with INC-, ALERT-",
             "Status keywords: investigating, mitigating, resolved",
-        ]
+        ],
     ),
     "Metric": Entity(
         name="Metric",
@@ -82,7 +84,7 @@ ENTITY_SCHEMAS = {
             "Look for metric patterns like xxx_usage, xxx_latency",
             "Check for numerical values with units",
             "Common metrics: CPU, memory, latency, error rate, throughput",
-        ]
+        ],
     ),
     "Log": Entity(
         name="Log",
@@ -100,7 +102,7 @@ ENTITY_SCHEMAS = {
             "Look for log levels like ERROR, WARN, FATAL",
             "Check for trace IDs (usually UUID format)",
             "Error messages often contain stack traces",
-        ]
+        ],
     ),
     "Team": Entity(
         name="Team",
@@ -113,7 +115,7 @@ ENTITY_SCHEMAS = {
         extraction_hints=[
             "Look for team names in ownership metadata",
             "Check for @mentions in incident discussions",
-        ]
+        ],
     ),
     "Deployment": Entity(
         name="Deployment",
@@ -129,7 +131,7 @@ ENTITY_SCHEMAS = {
         extraction_hints=[
             "Look for deployment patterns",
             "Check for version changes before incidents",
-        ]
+        ],
     ),
 }
 
@@ -196,7 +198,7 @@ RELATION_SCHEMAS = [
 def get_schema_for_llm_prompt() -> str:
     lines = []
     lines.append("# Neo4j Graph Schema for DevOps Domain\n")
-    
+
     lines.append("## Node Labels and Properties\n")
     for entity_name, entity in ENTITY_SCHEMAS.items():
         lines.append(f"### {entity_name}")
@@ -205,7 +207,7 @@ def get_schema_for_llm_prompt() -> str:
         for prop, desc in entity.properties.items():
             lines.append(f"  - {prop}: {desc}")
         lines.append("")
-    
+
     lines.append("## Relationship Types\n")
     for rel in RELATION_SCHEMAS:
         lines.append(f"### (:{rel.source})-[:{rel.name}]->(:{rel.target})")
@@ -213,11 +215,13 @@ def get_schema_for_llm_prompt() -> str:
         if rel.properties:
             lines.append(f"Properties: {', '.join(rel.properties)}")
         lines.append("")
-    
+
     lines.append("## Example Cypher Queries\n")
     lines.append("```cypher")
     lines.append("-- Find service and its dependencies")
-    lines.append("MATCH (s:Service {name: 'auth-service'})-[:DEPENDS_ON]->(dep:Service)")
+    lines.append(
+        "MATCH (s:Service {name: 'auth-service'})-[:DEPENDS_ON]->(dep:Service)"
+    )
     lines.append("RETURN s.name, collect(dep.name) as dependencies")
     lines.append("")
     lines.append("-- Find incidents affecting a service")
@@ -231,5 +235,5 @@ def get_schema_for_llm_prompt() -> str:
     lines.append("RETURN log.message, log.timestamp")
     lines.append("ORDER BY log.timestamp DESC LIMIT 10")
     lines.append("```")
-    
+
     return "\n".join(lines)

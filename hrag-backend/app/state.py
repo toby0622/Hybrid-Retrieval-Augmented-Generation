@@ -5,7 +5,7 @@ from pydantic import BaseModel, Field
 
 class DynamicSlotInfo(BaseModel):
     slots: Dict[str, Optional[str]] = Field(default_factory=dict)
-    
+
     _required_slots: List[str] = []
     _optional_slots: List[str] = []
 
@@ -118,7 +118,7 @@ class Message(BaseModel):
 class GraphState(TypedDict, total=False):
     query: str
     messages: List[Message]
-    
+
     domain: str
 
     intent: str

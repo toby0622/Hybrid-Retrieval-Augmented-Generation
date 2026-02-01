@@ -12,13 +12,13 @@ def initialize_domain_system(
     active_domain: Optional[str] = None,
 ) -> DomainConfig:
     base_path = Path(__file__).parent.parent
-    
+
     if scripts_path is None:
         scripts_path = base_path / settings.scripts_path
-    
+
     if domains_path is None:
         domains_path = base_path / settings.domains_path
-    
+
     if active_domain is None:
         active_domain = settings.active_domain
 

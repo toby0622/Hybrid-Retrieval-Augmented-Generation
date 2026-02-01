@@ -1,10 +1,9 @@
 from typing import Any, Dict, List
 
-from langchain_core.prompts import ChatPromptTemplate
-from langchain_openai import ChatOpenAI
-
 from app.state import GraphState, SlotInfo
 from config import settings
+from langchain_core.prompts import ChatPromptTemplate
+from langchain_openai import ChatOpenAI
 
 
 def get_llm():
@@ -265,9 +264,7 @@ async def extract_entities_node(content: str) -> List[Dict[str, Any]]:
     try:
         llm = get_llm()
         chain = ENTITY_EXTRACTION_PROMPT | llm
-        result = await chain.ainvoke(
-            {"content": content[:4000]}
-        )
+        result = await chain.ainvoke({"content": content[:4000]})
 
         import json
 
@@ -319,8 +316,8 @@ async def check_entity_conflicts(
 
 
 async def _compute_embedding_similarity(text1: str, text2: str) -> float:
-    from app.nodes.retrieval import get_embedding
     import numpy as np
+    from app.nodes.retrieval import get_embedding
 
     embedding1 = await get_embedding(text1)
     embedding2 = await get_embedding(text2)

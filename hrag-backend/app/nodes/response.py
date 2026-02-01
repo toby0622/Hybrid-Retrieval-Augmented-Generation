@@ -1,9 +1,8 @@
-from langchain_core.prompts import ChatPromptTemplate
-from langchain_openai import ChatOpenAI
-
 from app.domain_init import get_active_domain
 from app.state import DiagnosticResponse, GraphState, Message
 from config import settings
+from langchain_core.prompts import ChatPromptTemplate
+from langchain_openai import ChatOpenAI
 
 
 def get_llm():
@@ -37,29 +36,33 @@ CAPABILITIES you can mention:
 - {domain_config.display_name} specific tasks
 - {", ".join(domain_config.intents)} related activities
 """
-    return ChatPromptTemplate.from_messages([
-        ("system", system_prompt),
-        ("human", "<input>{query}</input>"),
-    ])
+    return ChatPromptTemplate.from_messages(
+        [
+            ("system", system_prompt),
+            ("human", "<input>{query}</input>"),
+        ]
+    )
 
 
 async def chat_response_node(state: GraphState) -> GraphState:
     query = state.get("query", "")
     current_domain = get_active_domain()
-    
+
     if not current_domain:
         return {**state, "response": "System error: Domain not initialized."}
 
     llm = get_llm()
     chat_prompt = _get_chat_prompt(current_domain)
     chat_chain = chat_prompt | llm
-    
+
     try:
         result = await chat_chain.ainvoke({"query": query})
         response = result.content.strip()
     except Exception as e:
         print(f"[ChatResponse] generation error: {e}")
-        response = "I'm having trouble generating a response right now. Please try again."
+        response = (
+            "I'm having trouble generating a response right now. Please try again."
+        )
 
     return {**state, "response": response}
 
@@ -72,7 +75,7 @@ async def clarification_response_node(state: GraphState) -> GraphState:
 
 async def diagnostic_response_node(state: GraphState) -> GraphState:
     diagnostic = state.get("diagnostic")
-    
+
     current_domain = get_active_domain()
     lang = current_domain.response_language if current_domain else "English"
 
@@ -88,7 +91,9 @@ async def diagnostic_response_node(state: GraphState) -> GraphState:
     if "Chinese" in lang or "中文" in lang:
         response_parts.append(f"根據混合檢索與分析，發現以下結果。\n")
     else:
-        response_parts.append(f"Based on hybrid retrieval and analysis, here are the findings.\n")
+        response_parts.append(
+            f"Based on hybrid retrieval and analysis, here are the findings.\n"
+        )
 
     response = "\n".join(response_parts)
 
@@ -98,7 +103,7 @@ async def diagnostic_response_node(state: GraphState) -> GraphState:
 async def end_conversation_node(state: GraphState) -> GraphState:
     current_domain = get_active_domain()
     name = current_domain.display_name if current_domain else "the system"
-    
+
     return {
         **state,
         "response": f"Thank you for using {name}. The conversation has ended. Feel free to start a new conversation anytime!",

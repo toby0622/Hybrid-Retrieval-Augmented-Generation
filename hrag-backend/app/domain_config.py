@@ -26,36 +26,36 @@ class QueryConfig:
     fallback_search: str = ""
 
 
-@dataclass  
+@dataclass
 class DomainConfig:
     name: str
     display_name: str
     description: str = ""
-    
+
     schema_name: str = ""
-    
+
     intents: List[str] = field(default_factory=lambda: ["question", "chat", "end"])
     intent_keywords: Dict[str, List[str]] = field(default_factory=dict)
-    
+
     slots: SlotConfig = field(default_factory=SlotConfig)
-    
+
     classification_prompt: PromptConfig = field(default_factory=PromptConfig)
     clarification_prompt: PromptConfig = field(default_factory=PromptConfig)
     reasoning_prompt: PromptConfig = field(default_factory=PromptConfig)
     chat_prompt: PromptConfig = field(default_factory=PromptConfig)
-    
+
     graph_queries: QueryConfig = field(default_factory=QueryConfig)
     vector_filter_fields: List[str] = field(default_factory=list)
-    
+
     routing_keywords: List[str] = field(default_factory=list)
-    
+
     response_language: str = "zh-TW"
 
     @classmethod
     def from_yaml(cls, yaml_path: Path) -> "DomainConfig":
         with open(yaml_path, "r", encoding="utf-8") as f:
             data = yaml.safe_load(f)
-        
+
         return cls._from_dict(data)
 
     @classmethod
@@ -123,13 +123,15 @@ class DomainRegistry:
             print(f"[DomainRegistry] Domains path does not exist: {cls._domains_path}")
             return []
 
-        yaml_files = list(cls._domains_path.glob("*.yaml")) + list(cls._domains_path.glob("*.yml"))
+        yaml_files = list(cls._domains_path.glob("*.yaml")) + list(
+            cls._domains_path.glob("*.yml")
+        )
         discovered = []
 
         for yaml_file in yaml_files:
             domain_name = yaml_file.stem
             discovered.append(domain_name)
-            
+
             try:
                 config = DomainConfig.from_yaml(yaml_file)
                 cls._domains[config.name] = config

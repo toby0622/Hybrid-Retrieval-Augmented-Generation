@@ -6,10 +6,9 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 import httpx
+from config import settings
 from qdrant_client import QdrantClient
 from qdrant_client.models import Distance, PointStruct, VectorParams
-
-from config import settings
 
 EMBEDDING_DIM = 768
 
@@ -46,7 +45,7 @@ connection pool exhaustion.
 - [ ] Add integration tests for connection pool management
 - [ ] Implement circuit breaker for database connections
 - [x] Add Grafana dashboard for connection pool metrics
-"""
+""",
     },
     {
         "title": "Postmortem: Auth Service Latency Degradation",
@@ -78,7 +77,7 @@ stale data but was not properly tested under load.
 ## Lessons Learned
 - Configuration changes need load testing
 - Cache hit rate should be a key SLI
-"""
+""",
     },
     {
         "title": "Postmortem: Redis Cache Stampede",
@@ -630,25 +629,25 @@ async def seed_documents(client: QdrantClient):
     points = []
 
     print(f"📄 Processing {len(all_docs)} documents...")
-    
+
     for i, doc in enumerate(all_docs):
         print(f"   [{i+1}/{len(all_docs)}] Embedding: {doc['title'][:50]}...")
-        
+
         embed_text = f"{doc['title']}\n\n{doc['content']}"
-        
+
         try:
             embedding = await get_embedding(embed_text)
         except Exception as e:
             print(f"   ⚠️  Failed to embed document: {e}")
             continue
-        
+
         payload = {
             "title": doc["title"],
             "content": doc["content"],
             "doc_type": doc["doc_type"],
             "service": doc.get("service", ""),
         }
-        
+
         if "incident_id" in doc:
             payload["incident_id"] = doc["incident_id"]
         if "severity" in doc:
@@ -657,9 +656,9 @@ async def seed_documents(client: QdrantClient):
             payload["trace_id"] = doc["trace_id"]
         if "level" in doc:
             payload["level"] = doc["level"]
-        
+
         points.append(PointStruct(id=i, vector=embedding, payload=payload))
-    
+
     print(f"\n📤 Uploading {len(points)} vectors to Qdrant...")
     client.upsert(collection_name=settings.qdrant_collection, points=points)
     print("   Upload complete.")
@@ -667,30 +666,28 @@ async def seed_documents(client: QdrantClient):
 
 async def verify_data(client: QdrantClient):
     print("\n🔍 Verifying data...\n")
-    
+
     collections = client.get_collections()
     collection_names = [c.name for c in collections.collections]
-    
+
     if settings.qdrant_collection not in collection_names:
         print(f"   ❌ Collection '{settings.qdrant_collection}' not found!")
         return
-    
+
     info = client.get_collection(settings.qdrant_collection)
     print(f"   Collection: {settings.qdrant_collection}")
     print(f"   Vector count: {info.points_count}")
     print(f"   Vector dimension: {info.config.params.vectors.size}")
-    
+
     print("\n   Documents by type:")
     for doc_type in ["postmortem", "runbook", "incident_log"]:
         result = client.scroll(
             collection_name=settings.qdrant_collection,
-            scroll_filter={
-                "must": [{"key": "doc_type", "match": {"value": doc_type}}]
-            },
+            scroll_filter={"must": [{"key": "doc_type", "match": {"value": doc_type}}]},
             limit=100,
         )
         print(f"     {doc_type}: {len(result[0])}")
-    
+
     print("\n   Sample search: 'database connection pool'")
     query_vector = await get_embedding("database connection pool exhaustion")
     results = client.query_points(
@@ -698,10 +695,10 @@ async def verify_data(client: QdrantClient):
         query=query_vector,
         limit=3,
     )
-    
+
     for hit in results.points:
         print(f"     [{hit.score:.3f}] {hit.payload['title'][:60]}...")
-    
+
     print("\n✅ Verification complete!")
 
 
@@ -711,7 +708,9 @@ async def main():
     parser.add_argument("--clear", action="store_true", help="Clear collection")
     args = parser.parse_args()
 
-    print(f"🔌 Connecting to Qdrant at {settings.qdrant_host}:{settings.qdrant_port}...")
+    print(
+        f"🔌 Connecting to Qdrant at {settings.qdrant_host}:{settings.qdrant_port}..."
+    )
     client = QdrantClient(host=settings.qdrant_host, port=settings.qdrant_port)
 
     try:
@@ -727,7 +726,7 @@ async def main():
             await create_collection(client)
             await seed_documents(client)
             await verify_data(client)
-            
+
             print("\n🎉 Seeding complete!")
 
     except Exception as e:

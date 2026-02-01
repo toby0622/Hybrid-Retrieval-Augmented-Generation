@@ -6,9 +6,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from neo4j import AsyncGraphDatabase
 from config import settings
-
+from neo4j import AsyncGraphDatabase
 
 SERVICES = [
     {
@@ -153,34 +152,179 @@ INCIDENTS = [
 ]
 
 METRICS = [
-    {"name": "cpu_usage", "value": 85.5, "unit": "percent", "service": "payment-api", "threshold": 80, "anomaly_score": 0.7},
-    {"name": "memory_percent", "value": 92.3, "unit": "percent", "service": "notification-service", "threshold": 85, "anomaly_score": 0.9},
-    {"name": "request_latency_p99", "value": 450, "unit": "ms", "service": "auth-service", "threshold": 200, "anomaly_score": 0.8},
-    {"name": "error_rate", "value": 5.2, "unit": "percent", "service": "payment-api", "threshold": 1, "anomaly_score": 0.95},
-    {"name": "db_connections", "value": 95, "unit": "count", "service": "db-primary", "threshold": 100, "anomaly_score": 0.85},
-    {"name": "cache_hit_rate", "value": 45.0, "unit": "percent", "service": "redis-cache", "threshold": 80, "anomaly_score": 0.6},
-    {"name": "queue_depth", "value": 15000, "unit": "count", "service": "message-queue", "threshold": 10000, "anomaly_score": 0.7},
-    {"name": "request_throughput", "value": 1200, "unit": "rps", "service": "api-gateway", "threshold": None, "anomaly_score": 0.1},
-    {"name": "gc_pause_time", "value": 120, "unit": "ms", "service": "user-service", "threshold": 100, "anomaly_score": 0.5},
-    {"name": "disk_usage", "value": 78, "unit": "percent", "service": "db-primary", "threshold": 85, "anomaly_score": 0.2},
+    {
+        "name": "cpu_usage",
+        "value": 85.5,
+        "unit": "percent",
+        "service": "payment-api",
+        "threshold": 80,
+        "anomaly_score": 0.7,
+    },
+    {
+        "name": "memory_percent",
+        "value": 92.3,
+        "unit": "percent",
+        "service": "notification-service",
+        "threshold": 85,
+        "anomaly_score": 0.9,
+    },
+    {
+        "name": "request_latency_p99",
+        "value": 450,
+        "unit": "ms",
+        "service": "auth-service",
+        "threshold": 200,
+        "anomaly_score": 0.8,
+    },
+    {
+        "name": "error_rate",
+        "value": 5.2,
+        "unit": "percent",
+        "service": "payment-api",
+        "threshold": 1,
+        "anomaly_score": 0.95,
+    },
+    {
+        "name": "db_connections",
+        "value": 95,
+        "unit": "count",
+        "service": "db-primary",
+        "threshold": 100,
+        "anomaly_score": 0.85,
+    },
+    {
+        "name": "cache_hit_rate",
+        "value": 45.0,
+        "unit": "percent",
+        "service": "redis-cache",
+        "threshold": 80,
+        "anomaly_score": 0.6,
+    },
+    {
+        "name": "queue_depth",
+        "value": 15000,
+        "unit": "count",
+        "service": "message-queue",
+        "threshold": 10000,
+        "anomaly_score": 0.7,
+    },
+    {
+        "name": "request_throughput",
+        "value": 1200,
+        "unit": "rps",
+        "service": "api-gateway",
+        "threshold": None,
+        "anomaly_score": 0.1,
+    },
+    {
+        "name": "gc_pause_time",
+        "value": 120,
+        "unit": "ms",
+        "service": "user-service",
+        "threshold": 100,
+        "anomaly_score": 0.5,
+    },
+    {
+        "name": "disk_usage",
+        "value": 78,
+        "unit": "percent",
+        "service": "db-primary",
+        "threshold": 85,
+        "anomaly_score": 0.2,
+    },
 ]
 
 LOGS = [
-    {"level": "ERROR", "message": "Connection refused to db-primary:5432", "service": "payment-api", "trace_id": "abc123-def456"},
-    {"level": "ERROR", "message": "NullPointerException in PaymentProcessor.process()", "service": "payment-api", "trace_id": "abc123-def456"},
-    {"level": "WARN", "message": "Connection pool near capacity: 95/100", "service": "db-primary", "trace_id": None},
-    {"level": "ERROR", "message": "Failed to acquire database connection within 5000ms", "service": "payment-api", "trace_id": "ghi789-jkl012"},
-    {"level": "WARN", "message": "Cache miss rate exceeded threshold: 55%", "service": "redis-cache", "trace_id": None},
-    {"level": "INFO", "message": "Service started successfully on port 8080", "service": "auth-service", "trace_id": None},
-    {"level": "ERROR", "message": "OutOfMemoryError: Java heap space", "service": "notification-service", "trace_id": "mno345-pqr678"},
-    {"level": "WARN", "message": "Request latency exceeded SLO: 450ms > 200ms", "service": "auth-service", "trace_id": "stu901-vwx234"},
-    {"level": "ERROR", "message": "Circuit breaker opened for payment-api", "service": "api-gateway", "trace_id": "yza567-bcd890"},
-    {"level": "INFO", "message": "Deployment completed: v4.0.2", "service": "payment-api", "trace_id": None},
-    {"level": "ERROR", "message": "SSL handshake timeout with upstream", "service": "api-gateway", "trace_id": "efg123-hij456"},
-    {"level": "WARN", "message": "Retry attempt 3/5 for message delivery", "service": "notification-service", "trace_id": "klm789-nop012"},
-    {"level": "ERROR", "message": "Authentication token validation failed: expired", "service": "auth-service", "trace_id": "qrs345-tuv678"},
-    {"level": "INFO", "message": "Health check passed", "service": "user-service", "trace_id": None},
-    {"level": "FATAL", "message": "Process killed by OOM killer", "service": "notification-service", "trace_id": None},
+    {
+        "level": "ERROR",
+        "message": "Connection refused to db-primary:5432",
+        "service": "payment-api",
+        "trace_id": "abc123-def456",
+    },
+    {
+        "level": "ERROR",
+        "message": "NullPointerException in PaymentProcessor.process()",
+        "service": "payment-api",
+        "trace_id": "abc123-def456",
+    },
+    {
+        "level": "WARN",
+        "message": "Connection pool near capacity: 95/100",
+        "service": "db-primary",
+        "trace_id": None,
+    },
+    {
+        "level": "ERROR",
+        "message": "Failed to acquire database connection within 5000ms",
+        "service": "payment-api",
+        "trace_id": "ghi789-jkl012",
+    },
+    {
+        "level": "WARN",
+        "message": "Cache miss rate exceeded threshold: 55%",
+        "service": "redis-cache",
+        "trace_id": None,
+    },
+    {
+        "level": "INFO",
+        "message": "Service started successfully on port 8080",
+        "service": "auth-service",
+        "trace_id": None,
+    },
+    {
+        "level": "ERROR",
+        "message": "OutOfMemoryError: Java heap space",
+        "service": "notification-service",
+        "trace_id": "mno345-pqr678",
+    },
+    {
+        "level": "WARN",
+        "message": "Request latency exceeded SLO: 450ms > 200ms",
+        "service": "auth-service",
+        "trace_id": "stu901-vwx234",
+    },
+    {
+        "level": "ERROR",
+        "message": "Circuit breaker opened for payment-api",
+        "service": "api-gateway",
+        "trace_id": "yza567-bcd890",
+    },
+    {
+        "level": "INFO",
+        "message": "Deployment completed: v4.0.2",
+        "service": "payment-api",
+        "trace_id": None,
+    },
+    {
+        "level": "ERROR",
+        "message": "SSL handshake timeout with upstream",
+        "service": "api-gateway",
+        "trace_id": "efg123-hij456",
+    },
+    {
+        "level": "WARN",
+        "message": "Retry attempt 3/5 for message delivery",
+        "service": "notification-service",
+        "trace_id": "klm789-nop012",
+    },
+    {
+        "level": "ERROR",
+        "message": "Authentication token validation failed: expired",
+        "service": "auth-service",
+        "trace_id": "qrs345-tuv678",
+    },
+    {
+        "level": "INFO",
+        "message": "Health check passed",
+        "service": "user-service",
+        "trace_id": None,
+    },
+    {
+        "level": "FATAL",
+        "message": "Process killed by OOM killer",
+        "service": "notification-service",
+        "trace_id": None,
+    },
 ]
 
 
@@ -207,7 +351,7 @@ async def seed_services(driver):
                     last_deploy: datetime()
                 })
                 """,
-                **svc
+                **svc,
             )
     print(f"   Created {len(SERVICES)} services.")
 
@@ -221,7 +365,10 @@ async def seed_dependencies(driver):
                 MATCH (a:Service {name: $src}), (b:Service {name: $tgt})
                 CREATE (a)-[:DEPENDS_ON {protocol: $protocol, latency_budget_ms: $latency}]->(b)
                 """,
-                src=src, tgt=tgt, protocol=protocol, latency=latency
+                src=src,
+                tgt=tgt,
+                protocol=protocol,
+                latency=latency,
             )
     print(f"   Created {len(DEPENDENCIES)} dependencies.")
 
@@ -247,7 +394,7 @@ async def seed_incidents(driver):
                 MATCH (s:Service {name: $affected_service})
                 CREATE (i)-[:AFFECTS]->(s)
                 """,
-                **inc
+                **inc,
             )
     print(f"   Created {len(INCIDENTS)} incidents with AFFECTS relations.")
 
@@ -270,7 +417,7 @@ async def seed_metrics(driver):
                 MATCH (s:Service {name: $service})
                 CREATE (m)-[:MEASURES]->(s)
                 """,
-                **metric
+                **metric,
             )
     print(f"   Created {len(METRICS)} metrics with MEASURES relations.")
 
@@ -292,7 +439,7 @@ async def seed_logs(driver):
                 CREATE (l)-[:GENERATED_BY]->(s)
                 """,
                 **log,
-                offset=len(LOGS) - i
+                offset=len(LOGS) - i,
             )
     print(f"   Created {len(LOGS)} log entries with GENERATED_BY relations.")
 
@@ -300,38 +447,29 @@ async def seed_logs(driver):
 async def seed_triggered_by(driver):
     print("⚡ Creating TRIGGERED_BY relationships...")
     async with driver.session() as session:
-        await session.run(
-            """
+        await session.run("""
             MATCH (i:Incident {id: 'INC-2024-001'}), (m:Metric {name: 'error_rate'})
             CREATE (i)-[:TRIGGERED_BY]->(m)
-            """
-        )
-        await session.run(
-            """
+            """)
+        await session.run("""
             MATCH (i:Incident {id: 'INC-2024-002'}), (m:Metric {name: 'request_latency_p99'})
             CREATE (i)-[:TRIGGERED_BY]->(m)
-            """
-        )
-        await session.run(
-            """
+            """)
+        await session.run("""
             MATCH (i:Incident {id: 'INC-2024-003'}), (m:Metric {name: 'cache_hit_rate'})
             CREATE (i)-[:TRIGGERED_BY]->(m)
-            """
-        )
-        await session.run(
-            """
+            """)
+        await session.run("""
             MATCH (i:Incident {id: 'INC-2024-004'}), (m:Metric {name: 'memory_percent'})
             CREATE (i)-[:TRIGGERED_BY]->(m)
-            """
-        )
+            """)
     print("   Created TRIGGERED_BY relationships.")
 
 
 async def verify_data(driver):
     print("\n🔍 Verifying data...\n")
     async with driver.session() as session:
-        result = await session.run(
-            """
+        result = await session.run("""
             CALL {
                 MATCH (s:Service) RETURN 'Service' as label, count(s) as count
                 UNION ALL
@@ -342,19 +480,17 @@ async def verify_data(driver):
                 MATCH (l:Log) RETURN 'Log' as label, count(l) as count
             }
             RETURN label, count
-            """
-        )
+            """)
         records = await result.data()
-        
+
         print("   Node Counts:")
         total_nodes = 0
         for rec in records:
             print(f"     {rec['label']}: {rec['count']}")
-            total_nodes += rec['count']
+            total_nodes += rec["count"]
         print(f"     Total: {total_nodes}")
-        
-        result = await session.run(
-            """
+
+        result = await session.run("""
             CALL {
                 MATCH ()-[r:DEPENDS_ON]->() RETURN 'DEPENDS_ON' as type, count(r) as count
                 UNION ALL
@@ -367,30 +503,27 @@ async def verify_data(driver):
                 MATCH ()-[r:TRIGGERED_BY]->() RETURN 'TRIGGERED_BY' as type, count(r) as count
             }
             RETURN type, count
-            """
-        )
+            """)
         records = await result.data()
-        
+
         print("\n   Relationship Counts:")
         total_rels = 0
         for rec in records:
             print(f"     {rec['type']}: {rec['count']}")
-            total_rels += rec['count']
+            total_rels += rec["count"]
         print(f"     Total: {total_rels}")
-        
+
         print("\n   Sample Query - Services with incidents:")
-        result = await session.run(
-            """
+        result = await session.run("""
             MATCH (i:Incident)-[:AFFECTS]->(s:Service)
             RETURN s.name as service, i.severity as severity, i.title as incident
             ORDER BY i.severity
             LIMIT 5
-            """
-        )
+            """)
         records = await result.data()
         for rec in records:
             print(f"     [{rec['severity']}] {rec['service']}: {rec['incident']}")
-    
+
     print("\n✅ Verification complete!")
 
 
@@ -402,8 +535,7 @@ async def main():
 
     print(f"🔌 Connecting to Neo4j at {settings.neo4j_uri}...")
     driver = AsyncGraphDatabase.driver(
-        settings.neo4j_uri,
-        auth=(settings.neo4j_user, settings.neo4j_password)
+        settings.neo4j_uri, auth=(settings.neo4j_user, settings.neo4j_password)
     )
 
     try:
@@ -424,7 +556,7 @@ async def main():
             await seed_logs(driver)
             await seed_triggered_by(driver)
             await verify_data(driver)
-            
+
             print("\n🎉 Seeding complete!")
 
     finally:
