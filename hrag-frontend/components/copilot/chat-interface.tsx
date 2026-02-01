@@ -9,7 +9,6 @@ import { DiagnosticCard } from './diagnostic-card';
 import { Message, ReasoningStep } from '@/types';
 import { apiClient, StreamEvent } from '@/lib/api';
 
-// Initial system message
 const INITIAL_MESSAGES: Message[] = [
   {
     id: 1,
@@ -31,7 +30,6 @@ export function ChatInterface({ addToast }: ChatInterfaceProps) {
   const [isConnected, setIsConnected] = useState<boolean | null>(null);
   const [healthInfo, setHealthInfo] = useState<{neo4j: string, qdrant: string, llm: string} | null>(null);
   
-  // Track current streaming reasoning steps
   const [streamingSteps, setStreamingSteps] = useState<ReasoningStep[]>([]);
   const [isStreaming, setIsStreaming] = useState(false);
   
@@ -41,7 +39,6 @@ export function ChatInterface({ addToast }: ChatInterfaceProps) {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, streamingSteps]);
 
-  // Check backend health on mount
   useEffect(() => {
     const checkHealth = async () => {
       try {
@@ -72,7 +69,6 @@ export function ChatInterface({ addToast }: ChatInterfaceProps) {
     if (actionType === 'case_study') {
       addToast('Generated new Case Study draft from incident analysis.', 'success');
     } else if (actionType === 'resolve') {
-      // Send feedback to backend
       if (threadId) {
         try {
           await apiClient.chat({
@@ -105,7 +101,6 @@ export function ChatInterface({ addToast }: ChatInterfaceProps) {
     setIsStreaming(true);
     setStreamingSteps([]);
 
-    // Handler for each reasoning step
     const handleStep = (step: ReasoningStep) => {
       setStreamingSteps(prev => {
         const existing = prev.find(s => s.id === step.id);
@@ -116,7 +111,6 @@ export function ChatInterface({ addToast }: ChatInterfaceProps) {
       });
     };
 
-    // Handler for complete response
     const handleComplete = (event: StreamEvent) => {
       setIsStreaming(false);
       setStreamingSteps([]);
@@ -125,7 +119,6 @@ export function ChatInterface({ addToast }: ChatInterfaceProps) {
         setThreadId(event.thread_id);
       }
 
-      // Add final message based on response type
       if (event.diagnostic) {
         const diagnosticMsg: Message = {
           id: Date.now() + 1,
@@ -157,7 +150,6 @@ export function ChatInterface({ addToast }: ChatInterfaceProps) {
       setIsLoading(false);
     };
 
-    // Handler for errors
     const handleError = (error: string) => {
       setIsStreaming(false);
       setStreamingSteps([]);
@@ -173,7 +165,6 @@ export function ChatInterface({ addToast }: ChatInterfaceProps) {
       setIsLoading(false);
     };
 
-    // Use streaming API
     await apiClient.chatStream(
       { query: currentInput, thread_id: threadId || undefined },
       handleStep,
@@ -184,7 +175,6 @@ export function ChatInterface({ addToast }: ChatInterfaceProps) {
 
   return (
     <div className="flex flex-col h-full bg-slate-950 relative overflow-hidden">
-      {/* Header */}
       <div className="h-16 border-b border-slate-800 flex items-center px-6 bg-slate-950/80 backdrop-blur-sm z-10 sticky top-0">
         <div>
           <h2 className="text-lg font-bold text-slate-100 flex items-center gap-2">
@@ -212,7 +202,6 @@ export function ChatInterface({ addToast }: ChatInterfaceProps) {
         </div>
       </div>
 
-      {/* Messages */}
       <div className="flex-1 overflow-y-auto p-6 space-y-6 scrollbar-thin scrollbar-thumb-slate-700 scrollbar-track-transparent">
         {messages.map((msg) => (
           <div key={msg.id} className={`flex gap-4 ${msg.role === 'user' ? 'flex-row-reverse' : ''}`}>
@@ -248,7 +237,6 @@ export function ChatInterface({ addToast }: ChatInterfaceProps) {
           </div>
         ))}
 
-        {/* Real-time Streaming Reasoning Steps */}
         {isStreaming && streamingSteps.length > 0 && (
           <div className="flex gap-4">
             <div className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 shadow-lg bg-blue-600 shadow-blue-500/20">
@@ -267,7 +255,6 @@ export function ChatInterface({ addToast }: ChatInterfaceProps) {
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Input */}
       <div className="p-4 border-t border-slate-800 bg-slate-900/50 backdrop-blur-md">
         <div className="relative max-w-4xl mx-auto flex gap-2">
           <Input

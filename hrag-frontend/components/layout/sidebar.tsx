@@ -39,12 +39,10 @@ function NavButton({ icon, active, onClick, label }: NavButtonProps) {
 export function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
   return (
     <div className="w-20 bg-slate-900 border-r border-slate-700 flex flex-col items-center py-6 gap-6 z-20">
-      {/* Logo */}
       <div className="p-3 bg-blue-600 rounded-xl shadow-lg shadow-blue-500/30">
         <Cpu className="text-white w-6 h-6" />
       </div>
       
-      {/* Navigation */}
       <div className="flex-1 flex flex-col gap-4 w-full px-2">
         <NavButton 
           icon={<MessageSquare size={24} />} 
@@ -60,7 +58,6 @@ export function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
         />
       </div>
       
-      {/* User Avatar */}
       <div className="mt-auto mb-4">
         <div className="w-10 h-10 rounded-full bg-slate-700 flex items-center justify-center text-xs font-bold text-slate-400 border border-slate-600">
           DEV

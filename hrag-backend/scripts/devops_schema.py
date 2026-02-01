@@ -1,12 +1,6 @@
-"""
-DevOps Domain Schema
-Defines entities and relations for DevOps incident management and observability.
-"""
-
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional
 
-# Schema metadata for registry discovery
 SCHEMA_NAME = "DevOps Incident Management"
 SCHEMA_DESCRIPTION = "Schema for DevOps infrastructure: services, incidents, metrics, and logs"
 
@@ -34,7 +28,6 @@ class DevOpsSchema:
     relations: List[Relation]
 
 
-# Entity Definitions
 ENTITY_SCHEMAS = {
     "Service": Entity(
         name="Service",
@@ -201,14 +194,9 @@ RELATION_SCHEMAS = [
 
 
 def get_schema_for_llm_prompt() -> str:
-    """
-    Generate a formatted schema description for LLM prompts.
-    Used by retrieval.py for dynamic Cypher query generation.
-    """
     lines = []
     lines.append("# Neo4j Graph Schema for DevOps Domain\n")
     
-    # Node types
     lines.append("## Node Labels and Properties\n")
     for entity_name, entity in ENTITY_SCHEMAS.items():
         lines.append(f"### {entity_name}")
@@ -218,7 +206,6 @@ def get_schema_for_llm_prompt() -> str:
             lines.append(f"  - {prop}: {desc}")
         lines.append("")
     
-    # Relationship types
     lines.append("## Relationship Types\n")
     for rel in RELATION_SCHEMAS:
         lines.append(f"### (:{rel.source})-[:{rel.name}]->(:{rel.target})")
@@ -227,7 +214,6 @@ def get_schema_for_llm_prompt() -> str:
             lines.append(f"Properties: {', '.join(rel.properties)}")
         lines.append("")
     
-    # Example queries
     lines.append("## Example Cypher Queries\n")
     lines.append("```cypher")
     lines.append("-- Find service and its dependencies")

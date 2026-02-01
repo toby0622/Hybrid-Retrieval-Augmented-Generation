@@ -1,8 +1,3 @@
-"""
-Input Guard Node
-Routes user input based on dynamic domain intent classification.
-"""
-
 import json
 from typing import Literal, Optional
 
@@ -15,7 +10,6 @@ from app.state import DynamicSlotInfo, GraphState, SlotInfo
 from config import settings
 
 
-# Initialize LLM (LM Studio compatible via OpenAI API)
 def get_llm():
     return ChatOpenAI(
         base_url=settings.llm_base_url,
@@ -25,15 +19,7 @@ def get_llm():
     )
 
 
-# =============================================================================
-# Domain Auto-Detection (LLM-based)
-# =============================================================================
-
-
 def _get_domain_routing_prompt(domains: list) -> ChatPromptTemplate:
-    """Generate domain routing prompt for LLM classification."""
-    
-    # Build domain descriptions from configs
     domain_descriptions = []
     for domain_name in domains:
         config = DomainRegistry.get_domain(domain_name)
@@ -70,22 +56,14 @@ RULES:
 
 
 async def _detect_domain_async(query: str) -> Optional[str]:
-    """
-    Detect which domain should handle this query using LLM.
-    
-    Uses semantic understanding to classify the query into the appropriate domain.
-    Returns the domain name, or None if detection fails.
-    """
     available_domains = list_available_domains()
     
     if not available_domains:
         return None
     
-    # If only one domain, use it directly (no LLM call needed)
     if len(available_domains) == 1:
         return available_domains[0]
     
-    # Use LLM to classify domain
     llm = get_llm()
     prompt = _get_domain_routing_prompt(available_domains)
     chain = prompt | llm
@@ -94,34 +72,20 @@ async def _detect_domain_async(query: str) -> Optional[str]:
         result = await chain.ainvoke({"query": query})
         detected = result.content.strip().lower()
         
-        # Match to valid domain name
         for domain_name in available_domains:
             if domain_name.lower() in detected:
-                print(f"[DomainRouter] LLM detected domain: {domain_name}")
                 return domain_name
         
-        # Fallback to first domain if no match
-        print(f"[DomainRouter] LLM response '{detected}' not matched, using first domain")
         return available_domains[0]
         
     except Exception as e:
-        print(f"[DomainRouter] LLM error: {e}, using first domain")
         return available_domains[0]
 
 
-# =============================================================================
-# Dynamic Prompt Generation
-# =============================================================================
-
-
 def _get_classification_prompt(domain_config) -> ChatPromptTemplate:
-    """Generate intent classification prompt based on domain config."""
-    
-    # Format intent categories for prompt
     categories_xml = "<categories>\n"
     for intent in domain_config.intents:
         keywords = domain_config.intent_keywords.get(intent, [])
-        # Ensure all keywords are strings (YAML might parse numbers like 500 as int)
         keywords_str = ", ".join([str(k) for k in keywords]) if keywords else "general query"
         categories_xml += f'  <category name="{intent}">\n'
         categories_xml += f"    Keywords: {keywords_str}\n"
@@ -152,12 +116,8 @@ Valid outputs: {" | ".join(domain_config.intents)}"""
 
 
 def _get_slot_extraction_prompt(domain_config) -> ChatPromptTemplate:
-    """Generate slot extraction prompt based on domain config."""
-    
-    # Format slots for prompt
     slots_xml = "<slot_schema>\n"
     
-    # Required slots
     for slot in domain_config.slots.required:
         examples = domain_config.slots.examples.get(slot, [])
         ex_str = f"Examples: {', '.join(examples)}" if examples else ""
@@ -165,7 +125,6 @@ def _get_slot_extraction_prompt(domain_config) -> ChatPromptTemplate:
         slots_xml += f"    Required field. {ex_str}\n"
         slots_xml += "  </slot>\n"
         
-    # Optional slots
     for slot in domain_config.slots.optional:
         examples = domain_config.slots.examples.get(slot, [])
         ex_str = f"Examples: {', '.join(examples)}" if examples else ""
@@ -175,7 +134,6 @@ def _get_slot_extraction_prompt(domain_config) -> ChatPromptTemplate:
         
     slots_xml += "</slot_schema>"
     
-    # Generate JSON schema example - escape curly braces for LangChain template
     schema_fields = [f'"{s}": "string|null"' for s in domain_config.slots.required + domain_config.slots.optional]
     schema_str = "{{" + ", ".join(schema_fields) + "}}"
 
@@ -199,26 +157,13 @@ Schema: {schema_str}"""
     return ChatPromptTemplate.from_messages([
         ("system", system_prompt),
         ("human", "<input>{query}</input>"),
-        ("ai", "{{"),  # Prefill start of JSON
+        ("ai", "{{"),
     ])
 
 
-# =============================================================================
-# Core Logic
-# =============================================================================
-
-
 async def input_guard_node(state: GraphState) -> GraphState:
-    """
-    Input Guardrails Node
-
-    0. Auto-detects domain based on query content
-    1. Classifies user intent based on active domain
-    2. For queries needing slots, extracts them dynamically
-    """
     query = state.get("query", "")
     
-    # Step 0: Auto-detect domain based on query content (LLM-based)
     detected_domain = await _detect_domain_async(query)
     if detected_domain:
         switch_domain(detected_domain)
@@ -226,7 +171,6 @@ async def input_guard_node(state: GraphState) -> GraphState:
     current_domain = get_active_domain()
     
     if not current_domain:
-        # Fallback if no domain loaded (should not happen in prod)
         print("[Error] No active domain loaded!")
         return {**state, "intent": "end", "response": "System error: No domain loaded."}
 
@@ -235,26 +179,18 @@ async def input_guard_node(state: GraphState) -> GraphState:
 
     llm = get_llm()
 
-    # Step 1: Classify intent
     classification_prompt = _get_classification_prompt(current_domain)
     classification_chain = classification_prompt | llm
     
     try:
         result = await classification_chain.ainvoke({"query": query})
         intent_raw = result.content.strip().lower()
-        print(f"[InputGuard] LLM intent response: '{intent_raw}'")
     except Exception as e:
-        print(f"[InputGuard] Classification error: {e}")
-        intent_raw = "chat"  # Fallback
+        intent_raw = "chat"
 
-    # Map to valid intent
     valid_intents = current_domain.intents
-    # Simple fuzzy matching
     matched_intent = next((i for i in valid_intents if i in intent_raw), "chat")
-    print(f"[InputGuard] Matched intent: '{matched_intent}' from valid: {valid_intents}")
     
-    # Step 2: Slot Extraction (if intent is not chat/end)
-    # Check if this intent requires slot filling (usually non-chat/end intents)
     needs_slots = matched_intent not in ["chat", "end"]
     
     slots = DynamicSlotInfo()
@@ -270,9 +206,7 @@ async def input_guard_node(state: GraphState) -> GraphState:
         try:
             result = await extraction_chain.ainvoke({"query": query})
             content = result.content.strip()
-            print(f"[InputGuard] Slot extraction raw: '{content[:200]}'")
             
-            # Handle prefill and markdown
             if not content.startswith("{"):
                 content = "{" + content
             if "```" in content:
@@ -281,15 +215,13 @@ async def input_guard_node(state: GraphState) -> GraphState:
                     content = content[4:]
             
             slot_data = json.loads(content)
-            print(f"[InputGuard] Extracted slots: {slot_data}")
             
-            # Populate DynamicSlotInfo
             for key, value in slot_data.items():
                 if value is not None:
                     slots.set_slot(key, value)
                     
         except Exception as e:
-            print(f"[InputGuard] Slot extraction error: {e}")
+            pass
 
     return {
         **state,
@@ -301,7 +233,6 @@ async def input_guard_node(state: GraphState) -> GraphState:
 
 
 def route_after_guard(state: GraphState) -> str:
-    """Routing function after input guard"""
     intent = state.get("intent", "chat")
 
     if intent == "end":
@@ -309,5 +240,4 @@ def route_after_guard(state: GraphState) -> str:
     elif intent == "chat":
         return "chat_response"
     else:
-        # Any other intent (search, analyze, incident) goes to slot check
         return "slot_check"

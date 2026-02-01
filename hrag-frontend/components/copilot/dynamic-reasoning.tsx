@@ -14,10 +14,8 @@ export function DynamicReasoning({ steps, isStreaming = false }: DynamicReasonin
   
   useEffect(() => {
     if (isStreaming) {
-      // In streaming mode, just display whatever steps we have
       setDisplayedSteps(steps);
     } else {
-      // In non-streaming mode, animate steps one by one
       setDisplayedSteps([]);
       steps.forEach((step, index) => {
         setTimeout(() => {
@@ -27,7 +25,6 @@ export function DynamicReasoning({ steps, isStreaming = false }: DynamicReasonin
     }
   }, [steps, isStreaming]);
 
-  // Check if all steps are completed
   const allStepsCompleted = displayedSteps.length > 0 && 
     displayedSteps.every(s => s.status === 'completed');
 
@@ -60,7 +57,6 @@ export function DynamicReasoning({ steps, isStreaming = false }: DynamicReasonin
           );
         })}
         
-        {/* Show loading indicator when streaming and all steps done, waiting for LLM */}
         {isStreaming && allStepsCompleted && (
           <div className="flex items-center gap-3 text-sm py-2 mt-2 pt-2 border-t border-slate-800">
             <Loader2 className="w-4 h-4 text-amber-400 animate-spin shrink-0" />
@@ -70,7 +66,6 @@ export function DynamicReasoning({ steps, isStreaming = false }: DynamicReasonin
           </div>
         )}
         
-        {/* Show processing indicator when steps are still coming in */}
         {isStreaming && !allStepsCompleted && (
           <div className="flex items-center gap-3 text-sm py-1 opacity-50 pl-0.5">
             <div className="w-3 h-3 rounded-full bg-slate-800 border border-slate-700" />

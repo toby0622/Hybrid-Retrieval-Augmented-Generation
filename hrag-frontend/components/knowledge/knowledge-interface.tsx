@@ -22,7 +22,6 @@ export function KnowledgeInterface({ addToast }: KnowledgeInterfaceProps) {
     pendingTasks: 0
   });
 
-  // Load initial data
   useEffect(() => {
     loadData();
   }, []);
@@ -30,7 +29,6 @@ export function KnowledgeInterface({ addToast }: KnowledgeInterfaceProps) {
   const loadData = async () => {
     setIsLoading(true);
     try {
-      // Load stats
       try {
         const statsData = await apiClient.getStats();
         setStats({
@@ -43,7 +41,6 @@ export function KnowledgeInterface({ addToast }: KnowledgeInterfaceProps) {
         throw new Error('Failed to load stats from backend');
       }
 
-      // Load gardener tasks
       try {
         const tasksData = await apiClient.getGardenerTasks();
         const mappedTasks: GardenerTask[] = tasksData.tasks.map((t: ApiGardenerTask) => ({
@@ -95,7 +92,6 @@ export function KnowledgeInterface({ addToast }: KnowledgeInterfaceProps) {
     try {
       const response = await apiClient.ingestDocument(file, 'document');
       
-      // Reload data to refresh stats
       await loadData();
       
       if (response.status === 'success') {
@@ -122,7 +118,6 @@ export function KnowledgeInterface({ addToast }: KnowledgeInterfaceProps) {
       <div className="p-8 pb-4">
         <h2 className="text-2xl font-bold text-slate-100 mb-6">Knowledge Base Ingestion</h2>
         
-        {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
           <Card>
             <CardContent className="p-4 flex items-center gap-4">
@@ -165,12 +160,10 @@ export function KnowledgeInterface({ addToast }: KnowledgeInterfaceProps) {
           </Card>
         </div>
 
-        {/* Upload Area */}
         <div className="mb-8">
           <UploadZone isUploading={isUploading} onFileSelect={handleFileUpload} />
         </div>
 
-        {/* Gardener Review Section */}
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-lg font-bold text-slate-200 flex items-center gap-2">
             The Gardener Review 

@@ -1,8 +1,3 @@
-"""
-Slot Filling Node
-Checks for required information and generates clarification questions based on active domain.
-"""
-
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_openai import ChatOpenAI
 
@@ -20,19 +15,10 @@ def get_llm():
     )
 
 
-# =============================================================================
-# Dynamic Prompt Generation
-# =============================================================================
-
-
 def _get_clarification_prompt(domain_config) -> ChatPromptTemplate:
-    """Generate clarification prompt based on domain config."""
-    
-    # Generate examples string
     examples_xml = "<examples>\n"
     if domain_config.clarification_prompt.examples:
         for ex in domain_config.clarification_prompt.examples:
-            # Handle both dict-based and simple examples
             if isinstance(ex, dict):
                 known = ex.get("known", "")
                 missing = ex.get("missing", "")
@@ -43,7 +29,6 @@ def _get_clarification_prompt(domain_config) -> ChatPromptTemplate:
                 examples_xml += f"    <question>{question}</question>\n"
                 examples_xml += "  </example>\n"
     elif domain_config.slots.required:
-        # Fallback simplified example
         examples_xml += "  <example>\n"
         examples_xml += "    <known>Partial info provided</known>\n"
         examples_xml += f"    <missing>{domain_config.slots.required[0]}</missing>\n"
@@ -51,7 +36,6 @@ def _get_clarification_prompt(domain_config) -> ChatPromptTemplate:
         examples_xml += "  </example>\n"
     examples_xml += "</examples>"
 
-    # List priorities
     priority_list = ""
     for i, slot in enumerate(domain_config.slots.required, 1):
         priority_list += f"{i}. {slot} (REQUIRED)\n"
@@ -102,13 +86,6 @@ MAX_CLARIFICATION_ROUNDS = 3
 
 
 async def slot_check_node(state: GraphState) -> GraphState:
-    """
-    Slot Check Node
-
-    Checks if we have sufficient information to proceed with retrieval.
-    If not, generates a clarification question.
-    """
-    # Handle both legacy and dynamic slot info
     slots = state.get("slots")
     if isinstance(slots, SlotInfo):
         slots = slots.to_dynamic()
@@ -122,23 +99,19 @@ async def slot_check_node(state: GraphState) -> GraphState:
     if not current_domain:
         return {**state, "clarification_question": None}
 
-    # Ensure slots are configured with current domain rules
     slots.configure(
         required=current_domain.slots.required,
         optional=current_domain.slots.optional
     )
 
-    # Check if slots are sufficient or max rounds reached
     if slots.is_sufficient() or clarification_count >= MAX_CLARIFICATION_ROUNDS:
         return {**state, "clarification_question": None}
 
-    # Generate clarification question
     missing = slots.get_missing_slots()
 
     if not missing:
         return {**state, "clarification_question": None}
 
-    # Build known info string
     filled = slots.get_filled_slots()
     known_info = "\n".join([f"{k}: {v}" for k, v in filled.items()])
     if not known_info:
@@ -169,7 +142,6 @@ async def slot_check_node(state: GraphState) -> GraphState:
 
 
 def route_after_slot_check(state: GraphState) -> str:
-    """Routing after slot check"""
     if state.get("clarification_question"):
         return "ask_clarification"
     return "retrieval"

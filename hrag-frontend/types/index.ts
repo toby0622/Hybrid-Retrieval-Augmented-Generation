@@ -1,5 +1,3 @@
-// API Types matching backend schemas
-
 export interface SlotInfo {
   service_name?: string;
   error_type?: string;

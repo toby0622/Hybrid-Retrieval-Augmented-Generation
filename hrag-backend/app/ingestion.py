@@ -1,8 +1,3 @@
-"""
-Document Ingestion Pipeline
-Schema-aware ETL for extracting graph entities and vectors from uploaded documents.
-"""
-
 import json
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
@@ -20,14 +15,8 @@ from app.schema_registry import SchemaRegistry
 from config import settings
 
 
-# =============================================================================
-# Data Models
-# =============================================================================
-
-
 @dataclass
 class ExtractedEntity:
-    """Entity extracted from document"""
     name: str
     type: str
     properties: Dict[str, Any] = field(default_factory=dict)
@@ -36,18 +25,12 @@ class ExtractedEntity:
 
 @dataclass
 class IngestResult:
-    """Result of document ingestion"""
     success: bool
     domain: str
     entities_created: int
     relations_created: int
     vectors_created: int
     errors: List[str] = field(default_factory=list)
-
-
-# =============================================================================
-# LLM Setup
-# =============================================================================
 
 
 def get_llm():
@@ -60,7 +43,6 @@ def get_llm():
 
 
 async def get_embedding(text: str) -> List[float]:
-    """Get embedding from LM Studio."""
     async with httpx.AsyncClient(timeout=60.0) as client:
         response = await client.post(
             f"{settings.llm_base_url}/embeddings",
@@ -72,15 +54,7 @@ async def get_embedding(text: str) -> List[float]:
         return data["data"][0]["embedding"]
 
 
-# =============================================================================
-# Schema-Aware Entity Extraction
-# =============================================================================
-
-
 def _build_extraction_prompt(schema) -> ChatPromptTemplate:
-    """Build extraction prompt from domain schema."""
-    
-    # Build entity types from schema
     entity_types_xml = "<entity_types>\n"
     for entity in schema.entities:
         props = ", ".join(entity.properties) if entity.properties else "name, description"
@@ -92,7 +66,6 @@ def _build_extraction_prompt(schema) -> ChatPromptTemplate:
         entity_types_xml += '  </type>\n'
     entity_types_xml += "</entity_types>"
     
-    # Build relation types from schema
     relation_types_xml = "<relationship_types>\n"
     for rel in schema.relations:
         relation_types_xml += f'  {rel.name} - (:{rel.source})-[:{rel.name}]->(:{rel.target})'
@@ -101,7 +74,6 @@ def _build_extraction_prompt(schema) -> ChatPromptTemplate:
         relation_types_xml += '\n'
     relation_types_xml += "</relationship_types>"
     
-    # Get entity and relation names for output schema
     entity_names = " | ".join([e.name for e in schema.entities])
     relation_names = " | ".join([r.name for r in schema.relations])
     
@@ -134,7 +106,7 @@ OUTPUT FORMAT:
     return ChatPromptTemplate.from_messages([
         ("system", system_prompt),
         ("human", "<document>\n{content}\n</document>"),
-        ("ai", "["),  # Prefill
+        ("ai", "["),
     ])
 
 
@@ -142,7 +114,6 @@ async def extract_entities_with_schema(
     content: str, 
     schema
 ) -> List[ExtractedEntity]:
-    """Extract entities using domain schema."""
     
     llm = get_llm()
     prompt = _build_extraction_prompt(schema)
@@ -152,11 +123,9 @@ async def extract_entities_with_schema(
         result = await chain.ainvoke({"content": content[:6000]})
         content_str = result.content.strip()
         
-        # Handle prefill
         if not content_str.startswith("["):
             content_str = "[" + content_str
         
-        # Handle markdown
         if "```" in content_str:
             content_str = content_str.split("```")[1]
             if content_str.startswith("json"):
@@ -181,14 +150,7 @@ async def extract_entities_with_schema(
         return []
 
 
-# =============================================================================
-# Neo4j Writer
-# =============================================================================
-
-
 async def write_entities_to_neo4j(entities: List[ExtractedEntity]) -> tuple[int, int]:
-    """Write extracted entities to Neo4j."""
-    
     nodes_created = 0
     rels_created = 0
     
@@ -199,7 +161,6 @@ async def write_entities_to_neo4j(entities: List[ExtractedEntity]) -> tuple[int,
     
     try:
         async with driver.session() as session:
-            # First pass: Create all nodes
             for entity in entities:
                 props = {"name": entity.name, **entity.properties}
                 props_str = ", ".join([f"{k}: ${k}" for k in props.keys()])
@@ -213,14 +174,12 @@ async def write_entities_to_neo4j(entities: List[ExtractedEntity]) -> tuple[int,
                 await session.run(query, **props)
                 nodes_created += 1
             
-            # Second pass: Create relationships
             for entity in entities:
                 for rel in entity.relationships:
                     target_name = rel.get("target")
                     rel_type = rel.get("type")
                     
                     if target_name and rel_type:
-                        # Find matching target entity type
                         target_entity = next(
                             (e for e in entities if e.name == target_name), 
                             None
@@ -252,22 +211,14 @@ async def write_entities_to_neo4j(entities: List[ExtractedEntity]) -> tuple[int,
     return nodes_created, rels_created
 
 
-# =============================================================================
-# Qdrant Writer
-# =============================================================================
-
-
 async def write_document_to_qdrant(
     content: str, 
     filename: str, 
     domain: str,
     doc_type: str = "document"
 ) -> int:
-    """Write document chunks to Qdrant."""
-    
     client = QdrantClient(host=settings.qdrant_host, port=settings.qdrant_port)
     
-    # Check collection exists
     collections = client.get_collections()
     collection_names = [c.name for c in collections.collections]
     
@@ -278,14 +229,12 @@ async def write_document_to_qdrant(
             vectors_config=VectorParams(size=768, distance=Distance.COSINE),
         )
     
-    # Get current max ID
     try:
         info = client.get_collection(settings.qdrant_collection)
         next_id = info.points_count
     except:
         next_id = 0
     
-    # Chunk document (simple paragraph-based chunking)
     chunks = _chunk_document(content)
     points = []
     
@@ -313,9 +262,6 @@ async def write_document_to_qdrant(
 
 
 def _chunk_document(content: str, max_chunk_size: int = 1000) -> List[str]:
-    """Split document into chunks."""
-    
-    # Split by double newlines (paragraphs)
     paragraphs = content.split("\n\n")
     
     chunks = []
@@ -339,14 +285,7 @@ def _chunk_document(content: str, max_chunk_size: int = 1000) -> List[str]:
     return chunks if chunks else [content]
 
 
-# =============================================================================
-# Main Ingestion Pipeline
-# =============================================================================
-
-
 async def detect_domain_from_content(content: str) -> str:
-    """Detect domain from content using LLM."""
-    
     available_domains = list_available_domains()
     
     if not available_domains:
@@ -355,7 +294,6 @@ async def detect_domain_from_content(content: str) -> str:
     if len(available_domains) == 1:
         return available_domains[0]
     
-    # Use LLM to detect
     from app.nodes.input_guard import _detect_domain_async
     detected = await _detect_domain_async(content[:1000])
     
@@ -367,32 +305,18 @@ async def ingest_document(
     filename: str,
     doc_type: str = "document"
 ) -> IngestResult:
-    """
-    Main ingestion pipeline.
-    
-    1. Auto-detect domain from content
-    2. Get schema for domain
-    3. Extract entities using LLM + schema
-    4. Write to Neo4j
-    5. Write to Qdrant
-    """
-    
     errors = []
     
-    # Step 1: Detect domain
     domain = await detect_domain_from_content(content)
     print(f"[Ingestion] Detected domain: {domain}")
     
-    # Ensure domain is active
     switch_domain(domain)
     
-    # Step 2: Get schema
     domain_config = DomainRegistry.get_domain(domain)
     schema = None
     if domain_config and domain_config.schema_name:
         schema = SchemaRegistry.get_schema(domain_config.schema_name)
     
-    # Step 3: Extract entities (if schema available)
     entities = []
     nodes_created = 0
     rels_created = 0
@@ -400,7 +324,6 @@ async def ingest_document(
     if schema:
         entities = await extract_entities_with_schema(content, schema)
         
-        # Step 4: Write to Neo4j
         if entities:
             try:
                 nodes_created, rels_created = await write_entities_to_neo4j(entities)
@@ -409,7 +332,6 @@ async def ingest_document(
     else:
         print(f"[Ingestion] No schema found for domain {domain}, skipping entity extraction")
     
-    # Step 5: Write to Qdrant (always, for vector search)
     vectors_created = 0
     try:
         vectors_created = await write_document_to_qdrant(

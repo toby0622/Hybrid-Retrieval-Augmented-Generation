@@ -1,8 +1,3 @@
-"""
-LLM Reasoning Node
-Context aggregation, tool use simulation, and diagnostic path generation
-"""
-
 import re
 from typing import List
 
@@ -24,14 +19,7 @@ def get_llm():
     )
 
 
-# =============================================================================
-# Dynamic Prompt Generation
-# =============================================================================
-
-
 def _get_reasoning_prompt(domain_config) -> ChatPromptTemplate:
-    """Generate reasoning prompt based on domain config."""
-    
     system_prompt = f"""<!-- 1. Task Context -->
 {domain_config.reasoning_prompt.system_identity or "You are the Core Reasoning Engine."}
 Your responsibility is to synthesize information from multiple sources and provide accurate analysis.
@@ -111,29 +99,18 @@ Structure your response as follows:
     return ChatPromptTemplate.from_messages([
         ("system", system_prompt),
         ("human", "Analyze the context and provide your assessment."),
-        ("ai", "<analysis>\n  <thinking>"),  # Prefill
+        ("ai", "<analysis>\n  <thinking>"),
     ])
 
 
 async def mcp_tool_node(state: GraphState) -> GraphState:
-    """
-    MCP Tool Use Node
-    Currently skipped until MCP integration is implemented.
-    """
-    # TODO: Implement actual MCP protocol connection
     return {**state, "mcp_results": []}
 
 
 async def reasoning_node(state: GraphState) -> GraphState:
-    """
-    LLM Reasoning Node
-
-    Aggregates context from all sources and generates diagnostic analysis.
-    """
     query = state.get("query", "")
     slots = state.get("slots")
     
-    # Handle legacy slots
     if isinstance(slots, SlotInfo):
         slots = slots.to_dynamic()
     elif slots is None:
@@ -147,14 +124,12 @@ async def reasoning_node(state: GraphState) -> GraphState:
     if not current_domain:
         return {**state, "response": "System error: Domain not initialized."}
 
-    # Build context strings
     slots_info = slots.to_display_string()
 
     graph_context = _format_results(graph_results) or "No graph results available."
     vector_context = _format_results(vector_results) or "No document matches found."
     mcp_context = _format_results(mcp_results) or "No real-time data available."
 
-    # Track reasoning steps
     reasoning_steps = [
         f"Input Guardrails: Intent '{state.get('intent', 'unknown')}' detected",
         f"Slot Extraction: {len(slots.get_filled_slots())} slots identified",
@@ -163,7 +138,6 @@ async def reasoning_node(state: GraphState) -> GraphState:
         "LLM Reasoning: Synthesizing analysis",
     ]
 
-    # Generate LLM analysis
     llm_analysis = "Analysis failed."
     try:
         llm = get_llm()
@@ -178,13 +152,10 @@ async def reasoning_node(state: GraphState) -> GraphState:
                 "mcp_context": mcp_context,
             }
         )
-        # Prepend the prefill to complete the XML structure
         llm_analysis = "<analysis>\n  <thinking>" + result.content
     except Exception as e:
-        print(f"[Reasoning] LLM error: {e}")
         llm_analysis = f"Analysis error: {e}"
 
-    # Build diagnostic path dynamically from LLM output + retrieval results
     diagnostic = _parse_diagnostic_response(
         llm_analysis, 
         query, 
@@ -201,7 +172,6 @@ async def reasoning_node(state: GraphState) -> GraphState:
 
 
 def _format_results(results: List[dict]) -> str:
-    """Format retrieval results into readable text"""
     if not results:
         return ""
 
@@ -220,15 +190,10 @@ def _parse_diagnostic_response(
     graph_results: List[dict] = None,
     vector_results: List[dict] = None
 ) -> DiagnosticResponse:
-    """
-    Parse the XML output from the LLM into a structured DiagnosticResponse.
-    Also includes graph and vector search results.
-    """
     steps = []
     graph_results = graph_results or []
     vector_results = vector_results or []
     
-    # Add Graph Search results first
     if graph_results:
         graph_summary_parts = []
         for r in graph_results[:5]:
@@ -258,7 +223,6 @@ def _parse_diagnostic_response(
             is_parallel=True,
         ))
     
-    # Add Vector Search results
     if vector_results:
         vector_summary_parts = []
         for r in vector_results[:5]:
@@ -287,19 +251,15 @@ def _parse_diagnostic_response(
             is_parallel=True,
         ))
     
-    # Extract root cause / conclusion from LLM
     root_cause_match = re.search(r"<root_cause[^>]*>(.*?)</root_cause>", llm_output, re.DOTALL)
     root_cause = root_cause_match.group(1).strip() if root_cause_match else "Analysis incomplete"
     
-    # Extract evidence
     evidence_match = re.search(r"<evidence>(.*?)</evidence>", llm_output, re.DOTALL)
     evidence = evidence_match.group(1).strip() if evidence_match else ""
     
-    # Extract recommendations
     recommendations = re.findall(r"<action[^>]*>(.*?)</action>", llm_output, re.DOTALL)
     suggestion = recommendations[0].strip() if recommendations else "No specific recommendation."
     
-    # Add LLM Analysis step
     steps.append(DiagnosticStep(
         id="result",
         source="LLM Analysis",

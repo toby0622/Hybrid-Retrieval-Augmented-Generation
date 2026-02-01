@@ -1,19 +1,8 @@
-"""
-Qdrant DevOps Seed Script
-Creates sample DevOps documentation vectors for semantic search.
-
-Usage:
-    python scripts/seed_qdrant_devops.py          # Seed data
-    python scripts/seed_qdrant_devops.py --verify # Verify data
-    python scripts/seed_qdrant_devops.py --clear  # Clear collection
-"""
-
 import argparse
 import asyncio
 import sys
 from pathlib import Path
 
-# Add parent to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 import httpx
@@ -22,11 +11,9 @@ from qdrant_client.models import Distance, PointStruct, VectorParams
 
 from config import settings
 
-# Embedding dimension for embeddinggemma-300m
 EMBEDDING_DIM = 768
 
 
-# Postmortem Documents (5)
 POSTMORTEMS = [
     {
         "title": "Postmortem: Payment API Database Connection Pool Exhaustion",
@@ -34,8 +21,7 @@ POSTMORTEMS = [
         "service": "payment-api",
         "incident_id": "INC-2024-001",
         "severity": "SEV1",
-        "content": """
-## Incident Summary
+        "content": """## Incident Summary
 On 2024-01-28, the payment-api service experienced a severe outage lasting approximately 2 hours. 
 During this time, approximately 30% of payment requests failed with 500 errors.
 
@@ -68,8 +54,7 @@ connection pool exhaustion.
         "service": "auth-service",
         "incident_id": "INC-2024-002",
         "severity": "SEV2",
-        "content": """
-## Incident Summary
+        "content": """## Incident Summary
 The auth-service experienced significant latency degradation, with p99 latency increasing 
 from 50ms to 500ms. This affected all services requiring authentication.
 
@@ -101,8 +86,7 @@ stale data but was not properly tested under load.
         "service": "redis-cache",
         "incident_id": "INC-2024-003",
         "severity": "SEV2",
-        "content": """
-## Incident Summary
+        "content": """## Incident Summary
 A cache stampede occurred when a large number of cache entries expired simultaneously,
 causing a surge of database queries that overloaded the primary database.
 
@@ -133,8 +117,7 @@ causing synchronized expiration and a thundering herd problem.
         "service": "notification-service",
         "incident_id": "INC-2024-004",
         "severity": "SEV3",
-        "content": """
-## Incident Summary
+        "content": """## Incident Summary
 The notification-service experienced repeated OOM (Out of Memory) crashes,
 causing delays in email and push notification delivery.
 
@@ -144,6 +127,8 @@ causing delays in email and push notification delivery.
 - 10:30 - Second OOM crash
 - 11:00 - Investigation started
 - 14:00 - Memory leak identified in email template engine
+- 14:00 - Root cause identified: unbounded template cache
+- 14:00 - Fix deployed: LRU cache with 100 entry limit
 
 ## Root Cause
 A memory leak in the email template rendering library (Handlebars.js) caused
@@ -166,8 +151,7 @@ The leak occurred because compiled templates were being cached without size limi
         "service": "api-gateway",
         "incident_id": "INC-2024-005",
         "severity": "SEV1",
-        "content": """
-## Incident Summary
+        "content": """## Incident Summary
 The api-gateway experienced intermittent connection refused errors,
 causing approximately 15% of API requests to fail.
 
@@ -196,14 +180,12 @@ Under investigation. Suspected to be related to:
     },
 ]
 
-# Runbook Documents (5)
 RUNBOOKS = [
     {
         "title": "Runbook: Database Connection Pool Exhaustion",
         "doc_type": "runbook",
         "service": "db-primary",
-        "content": """
-# Database Connection Pool Exhaustion Runbook
+        "content": """# Database Connection Pool Exhaustion Runbook
 
 ## Symptoms
 - Services reporting "Connection pool exhausted" errors
@@ -250,8 +232,7 @@ RUNBOOKS = [
         "title": "Runbook: Service High Latency Troubleshooting",
         "doc_type": "runbook",
         "service": "auth-service",
-        "content": """
-# High Latency Troubleshooting Runbook
+        "content": """# High Latency Troubleshooting Runbook
 
 ## Symptoms
 - p99 latency exceeding SLO (>200ms)
@@ -298,8 +279,7 @@ If unable to resolve within 30 minutes, escalate to:
         "title": "Runbook: Redis Cache Operations",
         "doc_type": "runbook",
         "service": "redis-cache",
-        "content": """
-# Redis Cache Operations Runbook
+        "content": """# Redis Cache Operations Runbook
 
 ## Common Operations
 
@@ -346,8 +326,7 @@ redis-cli -h redis-cache.internal INFO stats | grep keyspace
         "title": "Runbook: Kubernetes Pod OOM Troubleshooting",
         "doc_type": "runbook",
         "service": "notification-service",
-        "content": """
-# Kubernetes Pod OOM Troubleshooting Runbook
+        "content": """# Kubernetes Pod OOM Troubleshooting Runbook
 
 ## Symptoms
 - Pod restarts with reason: OOMKilled
@@ -399,8 +378,7 @@ kubectl cp <pod-name>:/tmp/heap.hprof ./heap.hprof
         "title": "Runbook: API Gateway Error Troubleshooting",
         "doc_type": "runbook",
         "service": "api-gateway",
-        "content": """
-# API Gateway Error Troubleshooting Runbook
+        "content": """# API Gateway Error Troubleshooting Runbook
 
 ## Symptoms
 - 5xx errors from gateway
@@ -453,7 +431,6 @@ kubectl get endpoints -n production
     },
 ]
 
-# Incident Logs (10)
 INCIDENT_LOGS = [
     {
         "title": "Incident Log: Payment failure investigation 2024-01-28",
@@ -461,8 +438,7 @@ INCIDENT_LOGS = [
         "service": "payment-api",
         "trace_id": "abc123-def456",
         "level": "ERROR",
-        "content": """
-[14:00:05] ALERT: Error rate exceeded 5% threshold for payment-api
+        "content": """[14:00:05] ALERT: Error rate exceeded 5% threshold for payment-api
 [14:00:10] ERROR: Connection refused to db-primary:5432, attempt 1/3
 [14:00:15] ERROR: Connection refused to db-primary:5432, attempt 2/3
 [14:00:20] ERROR: Connection refused to db-primary:5432, attempt 3/3
@@ -480,8 +456,7 @@ INCIDENT_LOGS = [
         "service": "auth-service",
         "trace_id": "stu901-vwx234",
         "level": "WARN",
-        "content": """
-[11:30:00] ALERT: p99 latency exceeded 200ms threshold (current: 450ms)
+        "content": """[11:30:00] ALERT: p99 latency exceeded 200ms threshold (current: 450ms)
 [11:30:05] INFO: Cache hit rate dropped to 15% (normal: 95%)
 [11:30:10] DEBUG: Investigating cache configuration changes
 [11:35:00] INFO: Found config change: TTL reduced from 3600s to 60s
@@ -497,8 +472,7 @@ INCIDENT_LOGS = [
         "service": "redis-cache",
         "trace_id": None,
         "level": "ERROR",
-        "content": """
-[04:00:00] CRITICAL: Database CPU at 100%
+        "content": """[04:00:00] CRITICAL: Database CPU at 100%
 [04:00:05] ERROR: Query timeout: SELECT * FROM users WHERE id IN (...)
 [04:00:10] ERROR: 50000 cache misses in last minute
 [04:00:15] INFO: Auto-scaling triggered for db-primary
@@ -516,8 +490,7 @@ INCIDENT_LOGS = [
         "service": "notification-service",
         "trace_id": "mno345-pqr678",
         "level": "FATAL",
-        "content": """
-[10:00:00] FATAL: Process killed by OOM killer (exit code 137)
+        "content": """[10:00:00] FATAL: Process killed by OOM killer (exit code 137)
 [10:00:05] INFO: Pod notification-service-abc12 restarting
 [10:00:30] INFO: Pod ready, resuming message processing
 [10:25:00] WARNING: Memory usage at 85%
@@ -535,8 +508,7 @@ INCIDENT_LOGS = [
         "service": "api-gateway",
         "trace_id": "efg123-hij456",
         "level": "ERROR",
-        "content": """
-[16:00:00] ALERT: 5xx error rate exceeded 10% for api-gateway
+        "content": """[16:00:00] ALERT: 5xx error rate exceeded 10% for api-gateway
 [16:00:05] ERROR: Connection refused to auth-service:8080
 [16:00:10] ERROR: SSL handshake timeout with payment-api
 [16:05:00] INFO: On-call engineer investigating
@@ -554,8 +526,7 @@ INCIDENT_LOGS = [
         "service": "db-primary",
         "trace_id": None,
         "level": "WARN",
-        "content": """
-[08:00:00] WARNING: Replication lag exceeded 5 seconds
+        "content": """[08:00:00] WARNING: Replication lag exceeded 5 seconds
 [08:00:05] INFO: Primary database under heavy write load
 [08:05:00] WARNING: Replication lag at 30 seconds
 [08:10:00] INFO: Identified long-running transaction
@@ -569,8 +540,7 @@ INCIDENT_LOGS = [
         "service": "message-queue",
         "trace_id": None,
         "level": "WARN",
-        "content": """
-[12:00:00] WARNING: Queue depth exceeded 10000 messages
+        "content": """[12:00:00] WARNING: Queue depth exceeded 10000 messages
 [12:00:05] INFO: Consumer processing rate: 100 msg/s
 [12:00:10] INFO: Producer rate: 500 msg/s
 [12:05:00] INFO: Scaling up consumer replicas
@@ -585,8 +555,7 @@ INCIDENT_LOGS = [
         "service": "user-service",
         "trace_id": None,
         "level": "WARN",
-        "content": """
-[14:00:00] WARNING: GC pause time exceeded 100ms (current: 120ms)
+        "content": """[14:00:00] WARNING: GC pause time exceeded 100ms (current: 120ms)
 [14:00:05] INFO: Memory usage at 80%
 [14:05:00] WARNING: Frequent full GC events detected
 [14:10:00] INFO: Heap size increased from 1GB to 2GB
@@ -600,8 +569,7 @@ INCIDENT_LOGS = [
         "service": "payment-api",
         "trace_id": None,
         "level": "WARN",
-        "content": """
-[09:00:00] INFO: Deployment started: payment-api v4.0.1 -> v4.0.2
+        "content": """[09:00:00] INFO: Deployment started: payment-api v4.0.1 -> v4.0.2
 [09:05:00] INFO: Canary deployment at 10%
 [09:10:00] WARNING: Error rate elevated in canary
 [09:15:00] ALERT: Rollback initiated due to elevated errors
@@ -616,8 +584,7 @@ INCIDENT_LOGS = [
         "service": "api-gateway",
         "trace_id": None,
         "level": "WARN",
-        "content": """
-[00:00:00] WARNING: SSL certificate expires in 7 days
+        "content": """[00:00:00] WARNING: SSL certificate expires in 7 days
 [00:00:05] INFO: Automated renewal initiated
 [00:05:00] INFO: New certificate generated
 [00:10:00] INFO: Certificate deployed to api-gateway
@@ -629,7 +596,6 @@ INCIDENT_LOGS = [
 
 
 async def get_embedding(text: str) -> list[float]:
-    """Get embedding from LM Studio."""
     async with httpx.AsyncClient(timeout=60.0) as client:
         response = await client.post(
             f"{settings.llm_base_url}/embeddings",
@@ -642,7 +608,6 @@ async def get_embedding(text: str) -> list[float]:
 
 
 async def clear_collection(client: QdrantClient):
-    """Clear existing collection."""
     print("🗑️  Clearing existing collection...")
     try:
         client.delete_collection(settings.qdrant_collection)
@@ -652,7 +617,6 @@ async def clear_collection(client: QdrantClient):
 
 
 async def create_collection(client: QdrantClient):
-    """Create vector collection."""
     print("📦 Creating collection...")
     client.create_collection(
         collection_name=settings.qdrant_collection,
@@ -662,7 +626,6 @@ async def create_collection(client: QdrantClient):
 
 
 async def seed_documents(client: QdrantClient):
-    """Seed all documents."""
     all_docs = POSTMORTEMS + RUNBOOKS + INCIDENT_LOGS
     points = []
 
@@ -671,7 +634,6 @@ async def seed_documents(client: QdrantClient):
     for i, doc in enumerate(all_docs):
         print(f"   [{i+1}/{len(all_docs)}] Embedding: {doc['title'][:50]}...")
         
-        # Combine title and content for embedding
         embed_text = f"{doc['title']}\n\n{doc['content']}"
         
         try:
@@ -680,7 +642,6 @@ async def seed_documents(client: QdrantClient):
             print(f"   ⚠️  Failed to embed document: {e}")
             continue
         
-        # Build payload
         payload = {
             "title": doc["title"],
             "content": doc["content"],
@@ -688,7 +649,6 @@ async def seed_documents(client: QdrantClient):
             "service": doc.get("service", ""),
         }
         
-        # Add optional fields
         if "incident_id" in doc:
             payload["incident_id"] = doc["incident_id"]
         if "severity" in doc:
@@ -706,10 +666,8 @@ async def seed_documents(client: QdrantClient):
 
 
 async def verify_data(client: QdrantClient):
-    """Verify seeded data."""
     print("\n🔍 Verifying data...\n")
     
-    # Check collection exists
     collections = client.get_collections()
     collection_names = [c.name for c in collections.collections]
     
@@ -717,13 +675,11 @@ async def verify_data(client: QdrantClient):
         print(f"   ❌ Collection '{settings.qdrant_collection}' not found!")
         return
     
-    # Get collection info
     info = client.get_collection(settings.qdrant_collection)
     print(f"   Collection: {settings.qdrant_collection}")
     print(f"   Vector count: {info.points_count}")
     print(f"   Vector dimension: {info.config.params.vectors.size}")
     
-    # Count by doc_type
     print("\n   Documents by type:")
     for doc_type in ["postmortem", "runbook", "incident_log"]:
         result = client.scroll(
@@ -735,7 +691,6 @@ async def verify_data(client: QdrantClient):
         )
         print(f"     {doc_type}: {len(result[0])}")
     
-    # Sample search
     print("\n   Sample search: 'database connection pool'")
     query_vector = await get_embedding("database connection pool exhaustion")
     results = client.query_points(
@@ -760,7 +715,6 @@ async def main():
     client = QdrantClient(host=settings.qdrant_host, port=settings.qdrant_port)
 
     try:
-        # Test connection
         client.get_collections()
         print("   Connected successfully!\n")
 
@@ -769,7 +723,6 @@ async def main():
         elif args.verify:
             await verify_data(client)
         else:
-            # Full seed
             await clear_collection(client)
             await create_collection(client)
             await seed_documents(client)

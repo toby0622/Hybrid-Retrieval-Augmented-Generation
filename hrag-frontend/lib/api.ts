@@ -1,8 +1,3 @@
-/**
- * HRAG API Client
- * Connects frontend to backend FastAPI endpoints
- */
-
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
 export interface ChatRequest {
@@ -131,23 +126,14 @@ class HRAGApiClient {
     return response.json();
   }
 
-  /**
-   * Health check
-   */
   async health(): Promise<HealthResponse> {
     return this.request<HealthResponse>('/health');
   }
 
-  /**
-   * Get system statistics
-   */
   async getStats(): Promise<StatsResponse> {
     return this.request<StatsResponse>('/stats');
   }
 
-  /**
-   * Send chat message (non-streaming)
-   */
   async chat(request: ChatRequest): Promise<ChatResponse> {
     return this.request<ChatResponse>('/chat', {
       method: 'POST',
@@ -155,9 +141,6 @@ class HRAGApiClient {
     });
   }
 
-  /**
-   * Send chat message with streaming (SSE)
-   */
   async chatStream(
     request: ChatRequest,
     onStep: (step: ReasoningStep) => void,
@@ -223,9 +206,6 @@ class HRAGApiClient {
     }
   }
 
-  /**
-   * Upload knowledge document
-   */
   async uploadDocument(file: File): Promise<UploadResponse> {
     const formData = new FormData();
     formData.append('file', file);
@@ -243,10 +223,6 @@ class HRAGApiClient {
     return response.json();
   }
 
-  /**
-   * Ingest document with schema-aware ETL pipeline
-   * Automatically extracts entities to Neo4j and vectors to Qdrant
-   */
   async ingestDocument(file: File, docType: string = 'document'): Promise<IngestResponse> {
     const formData = new FormData();
     formData.append('file', file);
@@ -265,16 +241,10 @@ class HRAGApiClient {
     return response.json();
   }
 
-  /**
-   * Get gardener tasks
-   */
   async getGardenerTasks(): Promise<{ tasks: GardenerTask[] }> {
     return this.request<{ tasks: GardenerTask[] }>('/gardener/tasks');
   }
 
-  /**
-   * Process gardener action
-   */
   async gardenerAction(
     entityId: string,
     action: 'approve' | 'reject' | 'merge',
@@ -291,8 +261,6 @@ class HRAGApiClient {
   }
 }
 
-// Export singleton instance
 export const apiClient = new HRAGApiClient();
 
-// Export class for custom instances
 export { HRAGApiClient };

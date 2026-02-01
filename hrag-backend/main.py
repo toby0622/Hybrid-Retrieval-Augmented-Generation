@@ -1,15 +1,9 @@
-"""
-HRAG Backend Entry Point
-Starts the FastAPI server
-"""
-
 import uvicorn
 
 from config import settings
 
 
 def main():
-    """Run the HRAG backend server"""
     print(f"""
 ╔══════════════════════════════════════════════════════════════╗
 ║                    HRAG Backend Server                       ║

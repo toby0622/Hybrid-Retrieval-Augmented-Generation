@@ -1,27 +1,15 @@
-"""
-Neo4j DevOps Seed Script
-Creates sample DevOps infrastructure data for testing and demonstration.
-
-Usage:
-    python scripts/seed_neo4j_devops.py          # Seed data
-    python scripts/seed_neo4j_devops.py --verify # Verify data
-    python scripts/seed_neo4j_devops.py --clear  # Clear all data
-"""
-
 import argparse
 import asyncio
 import sys
 from datetime import datetime, timedelta
 from pathlib import Path
 
-# Add parent to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from neo4j import AsyncGraphDatabase
 from config import settings
 
 
-# Sample Services (8 microservices)
 SERVICES = [
     {
         "name": "api-gateway",
@@ -89,7 +77,6 @@ SERVICES = [
     },
 ]
 
-# Service Dependencies
 DEPENDENCIES = [
     ("api-gateway", "auth-service", "gRPC", 50),
     ("api-gateway", "user-service", "REST", 100),
@@ -102,7 +89,6 @@ DEPENDENCIES = [
     ("notification-service", "message-queue", "AMQP", 50),
 ]
 
-# Sample Incidents (5 incidents)
 INCIDENTS = [
     {
         "id": "INC-2024-001",
@@ -119,7 +105,7 @@ INCIDENTS = [
     {
         "id": "INC-2024-002",
         "title": "Auth service latency degradation",
-        "description": "認證服務響應時間從50ms增加到500ms，影響所有需要認證的API。",
+        "description": "認證服務響應時間從50ms從500ms，影響所有需要認證的API。",
         "severity": "SEV2",
         "status": "Resolved",
         "created_at": (datetime.now() - timedelta(days=5)).isoformat(),
@@ -166,7 +152,6 @@ INCIDENTS = [
     },
 ]
 
-# Sample Metrics (10 metrics)
 METRICS = [
     {"name": "cpu_usage", "value": 85.5, "unit": "percent", "service": "payment-api", "threshold": 80, "anomaly_score": 0.7},
     {"name": "memory_percent", "value": 92.3, "unit": "percent", "service": "notification-service", "threshold": 85, "anomaly_score": 0.9},
@@ -180,7 +165,6 @@ METRICS = [
     {"name": "disk_usage", "value": 78, "unit": "percent", "service": "db-primary", "threshold": 85, "anomaly_score": 0.2},
 ]
 
-# Sample Logs (15 log entries)
 LOGS = [
     {"level": "ERROR", "message": "Connection refused to db-primary:5432", "service": "payment-api", "trace_id": "abc123-def456"},
     {"level": "ERROR", "message": "NullPointerException in PaymentProcessor.process()", "service": "payment-api", "trace_id": "abc123-def456"},
@@ -201,7 +185,6 @@ LOGS = [
 
 
 async def clear_data(driver):
-    """Clear all existing data."""
     print("🗑️  Clearing existing data...")
     async with driver.session() as session:
         await session.run("MATCH (n) DETACH DELETE n")
@@ -209,7 +192,6 @@ async def clear_data(driver):
 
 
 async def seed_services(driver):
-    """Create Service nodes."""
     print("📦 Creating Service nodes...")
     async with driver.session() as session:
         for svc in SERVICES:
@@ -231,7 +213,6 @@ async def seed_services(driver):
 
 
 async def seed_dependencies(driver):
-    """Create DEPENDS_ON relationships."""
     print("🔗 Creating service dependencies...")
     async with driver.session() as session:
         for src, tgt, protocol, latency in DEPENDENCIES:
@@ -246,7 +227,6 @@ async def seed_dependencies(driver):
 
 
 async def seed_incidents(driver):
-    """Create Incident nodes and AFFECTS relationships."""
     print("🚨 Creating Incident nodes...")
     async with driver.session() as session:
         for inc in INCIDENTS:
@@ -273,7 +253,6 @@ async def seed_incidents(driver):
 
 
 async def seed_metrics(driver):
-    """Create Metric nodes and MEASURES relationships."""
     print("📊 Creating Metric nodes...")
     async with driver.session() as session:
         for metric in METRICS:
@@ -297,7 +276,6 @@ async def seed_metrics(driver):
 
 
 async def seed_logs(driver):
-    """Create Log nodes and GENERATED_BY relationships."""
     print("📝 Creating Log nodes...")
     async with driver.session() as session:
         for i, log in enumerate(LOGS):
@@ -314,37 +292,32 @@ async def seed_logs(driver):
                 CREATE (l)-[:GENERATED_BY]->(s)
                 """,
                 **log,
-                offset=len(LOGS) - i  # Stagger timestamps
+                offset=len(LOGS) - i
             )
     print(f"   Created {len(LOGS)} log entries with GENERATED_BY relations.")
 
 
 async def seed_triggered_by(driver):
-    """Create TRIGGERED_BY relationships between incidents and anomalous metrics."""
     print("⚡ Creating TRIGGERED_BY relationships...")
     async with driver.session() as session:
-        # INC-001 triggered by error_rate metric
         await session.run(
             """
             MATCH (i:Incident {id: 'INC-2024-001'}), (m:Metric {name: 'error_rate'})
             CREATE (i)-[:TRIGGERED_BY]->(m)
             """
         )
-        # INC-002 triggered by latency metric
         await session.run(
             """
             MATCH (i:Incident {id: 'INC-2024-002'}), (m:Metric {name: 'request_latency_p99'})
             CREATE (i)-[:TRIGGERED_BY]->(m)
             """
         )
-        # INC-003 triggered by cache hit rate
         await session.run(
             """
             MATCH (i:Incident {id: 'INC-2024-003'}), (m:Metric {name: 'cache_hit_rate'})
             CREATE (i)-[:TRIGGERED_BY]->(m)
             """
         )
-        # INC-004 triggered by memory metric
         await session.run(
             """
             MATCH (i:Incident {id: 'INC-2024-004'}), (m:Metric {name: 'memory_percent'})
@@ -355,10 +328,8 @@ async def seed_triggered_by(driver):
 
 
 async def verify_data(driver):
-    """Verify seeded data."""
     print("\n🔍 Verifying data...\n")
     async with driver.session() as session:
-        # Count nodes by label
         result = await session.run(
             """
             CALL {
@@ -382,7 +353,6 @@ async def verify_data(driver):
             total_nodes += rec['count']
         print(f"     Total: {total_nodes}")
         
-        # Count relationships
         result = await session.run(
             """
             CALL {
@@ -408,7 +378,6 @@ async def verify_data(driver):
             total_rels += rec['count']
         print(f"     Total: {total_rels}")
         
-        # Sample query
         print("\n   Sample Query - Services with incidents:")
         result = await session.run(
             """
@@ -438,7 +407,6 @@ async def main():
     )
 
     try:
-        # Test connection
         async with driver.session() as session:
             await session.run("RETURN 1")
         print("   Connected successfully!\n")
@@ -448,7 +416,6 @@ async def main():
         elif args.verify:
             await verify_data(driver)
         else:
-            # Full seed
             await clear_data(driver)
             await seed_services(driver)
             await seed_dependencies(driver)

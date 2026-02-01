@@ -1,8 +1,3 @@
-"""
-Response Generation Node
-Formats the final response for the user based on active domain.
-"""
-
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_openai import ChatOpenAI
 
@@ -12,23 +7,15 @@ from config import settings
 
 
 def get_llm():
-    """Initialize LLM for chat responses."""
     return ChatOpenAI(
         base_url=settings.llm_base_url,
         api_key=settings.llm_api_key,
         model=settings.llm_model_name,
-        temperature=0.7,  # Higher temperature for more natural chat
+        temperature=0.7,
     )
 
 
-# =============================================================================
-# Dynamic Prompt Generation
-# =============================================================================
-
-
 def _get_chat_prompt(domain_config) -> ChatPromptTemplate:
-    """Generate chat response prompt based on domain config."""
-    
     system_prompt = f"""<!-- 1. Task Context -->
 {domain_config.chat_turn_prompt.system_identity or "You are a helpful assistant."}
 
@@ -57,9 +44,6 @@ CAPABILITIES you can mention:
 
 
 async def chat_response_node(state: GraphState) -> GraphState:
-    """
-    Generate response for chat/greeting messages using LLM.
-    """
     query = state.get("query", "")
     current_domain = get_active_domain()
     
@@ -81,18 +65,12 @@ async def chat_response_node(state: GraphState) -> GraphState:
 
 
 async def clarification_response_node(state: GraphState) -> GraphState:
-    """
-    Generate clarification question response
-    """
     clarification = state.get("clarification_question", "")
 
     return {**state, "response": clarification}
 
 
 async def diagnostic_response_node(state: GraphState) -> GraphState:
-    """
-    Format diagnostic response for presentation
-    """
     diagnostic = state.get("diagnostic")
     
     current_domain = get_active_domain()
@@ -104,27 +82,20 @@ async def diagnostic_response_node(state: GraphState) -> GraphState:
             "response": "Unable to generate analysis. Please provide more details.",
         }
 
-    # Build formatted response
     response_parts = []
 
-    # Add reasoning summary
     response_parts.append("## Analysis Complete\n")
     if "Chinese" in lang or "中文" in lang:
         response_parts.append(f"根據混合檢索與分析，發現以下結果。\n")
     else:
         response_parts.append(f"Based on hybrid retrieval and analysis, here are the findings.\n")
 
-    # Response will be enhanced by the diagnostic card in frontend
-    # backend just sends the text wrapper
     response = "\n".join(response_parts)
 
     return {**state, "response": response}
 
 
 async def end_conversation_node(state: GraphState) -> GraphState:
-    """
-    Handle conversation end
-    """
     current_domain = get_active_domain()
     name = current_domain.display_name if current_domain else "the system"
     

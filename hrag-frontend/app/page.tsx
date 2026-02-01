@@ -16,11 +16,9 @@ export default function Home() {
     <div className="flex w-full h-screen bg-black text-slate-200 font-sans selection:bg-blue-500/30">
       <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} />
       
-      {/* Toast Container */}
       <ToastNotification toasts={toasts} removeToast={removeToast} />
 
       <main className="flex-1 overflow-hidden relative">
-        {/* Background Pattern */}
         <div 
           className="absolute inset-0 pointer-events-none opacity-10" 
           style={{ 

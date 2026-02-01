@@ -1,8 +1,3 @@
-"""
-Hybrid Retrieval Nodes
-Graph search (Neo4j) + Vector search (Qdrant)
-"""
-
 import asyncio
 from typing import List, Optional, Any
 
@@ -18,7 +13,6 @@ from langchain_core.prompts import ChatPromptTemplate
 from langchain_openai import ChatOpenAI
 from config import settings
 
-# Embedding dimension for embeddinggemma-300m (768 dimensions)
 EMBEDDING_DIM = 768
 
 
@@ -32,8 +26,6 @@ def get_llm():
 
 
 async def generate_cypher_query(query: str, schema_str: str, slots: DynamicSlotInfo) -> str:
-    """Generate Cypher query using LLM and Schema."""
-    
     llm = get_llm()
     
     system_prompt = """You are a Neo4j Cypher expert.
@@ -64,7 +56,7 @@ Your task is to generate a Cypher query to answer the user's question based on t
     response = await chain.ainvoke({
         "schema": schema_str,
         "query": query,
-        "slots": slots.to_display_string() # Assuming to_display_string exists, otherwise str(slots)
+        "slots": slots.to_display_string()
     })
     
     cypher = response.content.replace("```cypher", "").replace("```", "").strip()
@@ -72,8 +64,6 @@ Your task is to generate a Cypher query to answer the user's question based on t
 
 
 class Neo4jClient:
-    """Neo4j graph database client"""
-
     _driver = None
 
     @classmethod
@@ -84,12 +74,9 @@ class Neo4jClient:
                     settings.neo4j_uri,
                     auth=(settings.neo4j_user, settings.neo4j_password),
                 )
-                # Test connection
                 async with cls._driver.session() as session:
                     await session.run("RETURN 1")
-                print("✅ Neo4j connected successfully")
             except Exception as e:
-                print(f"❌ Neo4j connection failed: {e}")
                 cls._driver = None
                 return None
         return cls._driver
@@ -102,8 +89,6 @@ class Neo4jClient:
 
 
 class QdrantClientWrapper:
-    """Qdrant vector database client"""
-
     _client: Optional[QdrantClient] = None
 
     @classmethod
@@ -113,24 +98,14 @@ class QdrantClientWrapper:
                 cls._client = QdrantClient(
                     host=settings.qdrant_host, port=settings.qdrant_port
                 )
-                # Test connection
                 cls._client.get_collections()
-                print("✅ Qdrant connected successfully")
             except Exception as e:
-                print(f"❌ Qdrant connection failed: {e}")
                 cls._client = None
                 return None
         return cls._client
 
 
 async def get_embedding(text: str) -> List[float]:
-    """
-    Get embedding from LM Studio embedding model.
-    Uses the OpenAI-compatible /v1/embeddings endpoint.
-    
-    Raises:
-        RuntimeError: If embedding generation fails.
-    """
     async with httpx.AsyncClient(timeout=30.0) as client:
         response = await client.post(
             f"{settings.llm_base_url}/embeddings",
@@ -143,12 +118,6 @@ async def get_embedding(text: str) -> List[float]:
 
 
 async def graph_search_node(state: GraphState) -> GraphState:
-    """
-    Graph Search Node (Neo4j)
-
-    Queries the knowledge graph based on active domain configuration.
-    """
-    # Handle legacy slots
     slots = state.get("slots")
     if isinstance(slots, SlotInfo):
         slots = slots.to_dynamic()
@@ -159,7 +128,6 @@ async def graph_search_node(state: GraphState) -> GraphState:
     current_domain = get_active_domain()
     
     if not current_domain:
-        print("[GraphSearch] Warning: No active domain found, skipping search.")
         return {**state, "graph_results": []}
 
     results: List[RetrievalResult] = []
@@ -169,43 +137,29 @@ async def graph_search_node(state: GraphState) -> GraphState:
 
         if driver:
             async with driver.session() as session:
-                # Prepare query parameters
                 params = {"hint": query}
-                # Add all slots as parameters
                 params.update(slots.get_filled_slots())
                 
-                
-                # Determine which Cypher query to run
                 cypher = ""
                 
-                # Try to generate dynamic query first
                 if current_domain.schema_name:
                     schema = SchemaRegistry.get_schema(current_domain.schema_name)
                     if schema and schema.extraction_prompt:
-                        print(f"[GraphSearch] Generating dynamic Cypher for schema: {current_domain.schema_name}")
                         try:
                             cypher = await generate_cypher_query(query, schema.extraction_prompt, slots)
-                            print(f"[GraphSearch] Generated Cypher: {cypher}")
                         except Exception as gen_err:
-                             print(f"[GraphSearch] Cypher generation failed: {gen_err}")
+                             pass
                 
-                # Fallback to configured primary search
                 if not cypher:
-                     print("[GraphSearch] Using fallback primary_search query.")
                      cypher = current_domain.graph_queries.primary_search
                 
                 if not cypher:
-                    print("[GraphSearch] Warning: No efficient query source found.")
                     return {**state, "graph_results": []}
 
                 result = await session.run(cypher, **params)
                 records = await result.data()
 
                 for record in records:
-                    # Construct title/content dynamically based on returned fields
-                    # We expect the query to return readable fields
-                    
-                    # Try to find a 'name' or 'subject' or 'title' for the result title
                     title_candidates = ["subject", "name", "title", "id", "event_id"]
                     title = "Graph Result"
                     for key in title_candidates:
@@ -213,7 +167,6 @@ async def graph_search_node(state: GraphState) -> GraphState:
                             title = f"{key.title()}: {record[key]}"
                             break
                             
-                    # Everything else goes into content/metadata
                     content_parts = []
                     for k, v in record.items():
                         if k not in title_candidates and v:
@@ -229,21 +182,18 @@ async def graph_search_node(state: GraphState) -> GraphState:
                             title=title,
                             content=content,
                             metadata=record,
-                            confidence=0.85,  # Heuristic confidence
+                            confidence=0.85,
                             raw_data=record,
                         ).model_dump())
                     )
 
     except Exception as e:
-        print(f"[GraphSearch] Error: {e}")
-        # Don't fail the whole workflow, just return empty results
-        # raise RuntimeError(f"Graph search failed: {e}") from e
+        pass
 
     return {**state, "graph_results": results}
 
 
 def _make_serializable(obj: Any) -> Any:
-    """Recursively convert Neo4j types (DateTime, etc.) to strings."""
     from neo4j.time import DateTime, Date, Time, Duration
     
     if isinstance(obj, dict):
@@ -257,14 +207,8 @@ def _make_serializable(obj: Any) -> Any:
 
 
 async def vector_search_node(state: GraphState) -> GraphState:
-    """
-    Vector Search Node (Qdrant)
-
-    Semantic search over document embeddings with dynamic filtering.
-    """
     query = state.get("query", "")
     
-    # Handle legacy slots
     slots = state.get("slots")
     if isinstance(slots, SlotInfo):
         slots = slots.to_dynamic()
@@ -278,23 +222,18 @@ async def vector_search_node(state: GraphState) -> GraphState:
         client = QdrantClientWrapper.get_client()
 
         if client:
-            # Check if collection exists
             collections = client.get_collections()
             collection_names = [c.name for c in collections.collections]
 
             if settings.qdrant_collection in collection_names:
-                # Generate query embedding using LM Studio
                 query_vector = await get_embedding(query)
 
-                # Build filter based on domain config and slots
                 filter_conditions = []
                 
                 if current_domain:
                     filled_slots = slots.get_filled_slots()
                     for field in current_domain.vector_filter_fields:
                         if field in filled_slots:
-                             # Add filter condition
-                             # Assumes slot name matches Qdrant payload field name
                             filter_conditions.append(
                                 FieldCondition(
                                     key=field, 
@@ -306,7 +245,6 @@ async def vector_search_node(state: GraphState) -> GraphState:
                     Filter(must=filter_conditions) if filter_conditions else None
                 )
 
-                # Execute search using query_points (Qdrant client >= 1.10)
                 try:
                     search_results = client.query_points(
                         collection_name=settings.qdrant_collection,
@@ -330,37 +268,28 @@ async def vector_search_node(state: GraphState) -> GraphState:
                             ).model_dump())
                         )
                 except Exception as search_err:
-                    print(f"[VectorSearch] Query failed: {search_err}")
+                    pass
                     
             else:
-                 print(f"[VectorSearch] Collection '{settings.qdrant_collection}' not found.")
+                 pass
         else:
-            print("[VectorSearch] Client not available")
+            pass
 
     except Exception as e:
-         print(f"[VectorSearch] Error: {e}")
-         # Don't fail the whole workflow
+         pass
 
     return {**state, "vector_results": results}
 
 
 async def hybrid_retrieval_node(state: GraphState) -> GraphState:
-    """
-    Hybrid Retrieval Node
-
-    Runs graph and vector search in parallel and aggregates results.
-    """
-    # Run both searches in parallel
     graph_task = asyncio.create_task(graph_search_node(state))
     vector_task = asyncio.create_task(vector_search_node(state))
 
     graph_state = await graph_task
     vector_state = await vector_task
 
-    # Merge results
     return {
         **state,
         "graph_results": graph_state.get("graph_results", []),
         "vector_results": vector_state.get("vector_results", []),
     }
-

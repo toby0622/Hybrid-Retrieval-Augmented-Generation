@@ -1,8 +1,3 @@
-"""
-Feedback Processing Node
-Handles user feedback and knowledge base updates
-"""
-
 from typing import Any, Dict, List
 
 from langchain_core.prompts import ChatPromptTemplate
@@ -21,10 +16,6 @@ def get_llm():
     )
 
 
-# =============================================================================
-# CASE_STUDY_PROMPT - Post-Mortem Case Study Generation
-# Anthropic 10-Element Framework Applied
-# =============================================================================
 CASE_STUDY_PROMPT = ChatPromptTemplate.from_messages(
     [
         (
@@ -107,26 +98,17 @@ Generate the post-mortem case study based on the incident data provided.""",
 
 
 async def feedback_node(state: GraphState) -> GraphState:
-    """
-    Process user feedback and route accordingly
-    """
     feedback = state.get("feedback")
 
     if feedback == "resolved":
-        # Trigger case study generation
         return await _generate_case_study(state)
     elif feedback == "more_info":
-        # Reset for more investigation
-        return {**state, "clarification_count": 0}  # Allow more clarification rounds
+        return {**state, "clarification_count": 0}
     else:
-        # End conversation
         return state
 
 
 async def _generate_case_study(state: GraphState) -> GraphState:
-    """
-    Generate case study from resolved incident
-    """
     slots = state.get("slots", SlotInfo())
     diagnostic = state.get("diagnostic")
     query = state.get("query", "")
@@ -134,7 +116,6 @@ async def _generate_case_study(state: GraphState) -> GraphState:
     if not diagnostic:
         return {**state, "case_study_generated": False}
 
-    # Format diagnostic summary
     diagnostic_summary = "\n".join(
         [f"- {step.title}: {step.detail}" for step in diagnostic.path]
     )
@@ -153,9 +134,6 @@ async def _generate_case_study(state: GraphState) -> GraphState:
         )
         case_study = result.content
 
-        # In production: Save to vector DB and graph DB
-        # await save_case_study(case_study, slots, diagnostic)
-
         return {
             **state,
             "case_study_generated": True,
@@ -171,7 +149,6 @@ async def _generate_case_study(state: GraphState) -> GraphState:
 
 
 def route_after_feedback(state: GraphState) -> str:
-    """Route based on feedback type"""
     feedback = state.get("feedback")
 
     if feedback == "resolved":
@@ -182,12 +159,7 @@ def route_after_feedback(state: GraphState) -> str:
         return "end"
 
 
-# --- Knowledge Ingestion Pipeline ---
-
-
 class KnowledgeIngestionState:
-    """State for knowledge ingestion pipeline"""
-
     def __init__(self, file_content: str, file_name: str, file_type: str):
         self.file_content = file_content
         self.file_name = file_name
@@ -199,10 +171,6 @@ class KnowledgeIngestionState:
         self.approved_entities: List[Dict[str, Any]] = []
 
 
-# =============================================================================
-# ENTITY_EXTRACTION_PROMPT - Knowledge Graph Entity Extraction
-# Anthropic 10-Element Framework Applied
-# =============================================================================
 ENTITY_EXTRACTION_PROMPT = ChatPromptTemplate.from_messages(
     [
         (
@@ -288,32 +256,26 @@ Extract entities from the following document:
 {content}
 </document>""",
         ),
-        ("ai", "["),  # <!-- 10. Prefilled Response -->
+        ("ai", "["),
     ]
 )
 
 
 async def extract_entities_node(content: str) -> List[Dict[str, Any]]:
-    """
-    Extract entities from document for knowledge graph
-    """
     try:
         llm = get_llm()
         chain = ENTITY_EXTRACTION_PROMPT | llm
         result = await chain.ainvoke(
             {"content": content[:4000]}
-        )  # Limit content length
+        )
 
         import json
 
         content_str = result.content.strip()
 
-        # Handle prefill: response starts after the prefilled "["
-        # So we need to prepend "[" to complete the JSON array
         if not content_str.startswith("["):
             content_str = "[" + content_str
 
-        # Handle markdown code blocks (fallback)
         if "```" in content_str:
             content_str = content_str.split("```")[1]
             if content_str.startswith("json"):
@@ -330,13 +292,8 @@ async def extract_entities_node(content: str) -> List[Dict[str, Any]]:
 async def check_entity_conflicts(
     new_entity: Dict[str, Any], existing_entities: List[Dict[str, Any]]
 ) -> Dict[str, Any]:
-    """
-    Check if entity conflicts with existing entities (Entity Resolution)
-    Uses embedding-based semantic similarity for robust comparison.
-    """
     new_name = new_entity.get("name", "")
     new_description = new_entity.get("description", "")
-    # Combine name and description for richer semantic representation
     new_text = f"{new_name}: {new_description}" if new_description else new_name
 
     for existing in existing_entities:
@@ -348,10 +305,8 @@ async def check_entity_conflicts(
             else existing_name
         )
 
-        # Compute semantic similarity using embeddings
         similarity = await _compute_embedding_similarity(new_text, existing_text)
 
-        # Threshold 0.85 for semantic similarity (more robust than lexical)
         if similarity > 0.85:
             return {
                 "has_conflict": True,
@@ -364,22 +319,15 @@ async def check_entity_conflicts(
 
 
 async def _compute_embedding_similarity(text1: str, text2: str) -> float:
-    """
-    Compute cosine similarity between two texts using embedding model.
-    Uses LM Studio embedding API for semantic comparison.
-    """
     from app.nodes.retrieval import get_embedding
     import numpy as np
 
-    # Get embeddings for both texts
     embedding1 = await get_embedding(text1)
     embedding2 = await get_embedding(text2)
 
-    # Convert to numpy arrays
     vec1 = np.array(embedding1)
     vec2 = np.array(embedding2)
 
-    # Compute cosine similarity
     dot_product = np.dot(vec1, vec2)
     norm1 = np.linalg.norm(vec1)
     norm2 = np.linalg.norm(vec2)
