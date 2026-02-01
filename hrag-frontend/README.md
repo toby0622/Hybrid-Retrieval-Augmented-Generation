@@ -1,6 +1,6 @@
 # HRAG Frontend
 
-The frontend for the **DevOps Incident Response Copilot**, built with **Next.js 14**, **Tailwind CSS**, and **React**.
+The frontend for the **DevOps Incident Response Copilot**, built with **Next.js 16**, **Tailwind CSS**, and **React 19**.
 
 ## 🚀 Features
 
@@ -11,7 +11,7 @@ The frontend for the **DevOps Incident Response Copilot**, built with **Next.js 
 
 ## 🛠️ Prerequisites
 
-- **Node.js 18+**
+- **Node.js 20+**
 - **npm** or **yarn**
 
 ## 📦 Installation

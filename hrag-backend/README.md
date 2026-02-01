@@ -33,12 +33,26 @@ The backend for the Hybrid RAG DevOps Copilot, built with FastAPI, LangGraph, Ne
 4.  Set up environment variables:
     Create a `.env` file (copy from `.env.example`) and populate it:
     ```env
-    GOOGLE_API_KEY=your_key_here
+    # LLM Configuration (LM Studio local server)
+    LLM_BASE_URL=http://localhost:8192/v1
+    LLM_API_KEY=lm-studio
+    LLM_MODEL_NAME=google/gemma-3-27b
+    EMBEDDING_MODEL_NAME=text-embedding-embeddinggemma-300m
+
+    # Neo4j Configuration
     NEO4J_URI=bolt://localhost:7687
-    NEO4J_USERNAME=neo4j
+    NEO4J_USER=neo4j
     NEO4J_PASSWORD=password
-    QDRANT_URL=http://localhost:6333
-    QDRANT_API_KEY=your_key_here
+
+    # Qdrant Configuration
+    QDRANT_HOST=localhost
+    QDRANT_PORT=6333
+    QDRANT_COLLECTION=hrag_documents
+
+    # API Configuration
+    API_HOST=0.0.0.0
+    API_PORT=8000
+    DEBUG=true
     ```
 
 ## 🗄️ Database Seeding

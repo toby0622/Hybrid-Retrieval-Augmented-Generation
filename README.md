@@ -14,19 +14,33 @@ This project implements a "Human-in-the-Loop" architecture for incident manageme
 ## 📂 Project Structure
 
 ```
-├── hrag-backend/          # FastAPI backend with LangGraph agent
+├── hrag-backend/              # FastAPI backend
 │   ├── app/
-│   │   ├── config/        # Domain configuration (YAML schemas)
-│   │   ├── graph/         # LangGraph workflow definitions
-│   │   ├── services/      # External service integrations (Neo4j, Qdrant, LLM)
-│   │   └── api/           # API endpoints
-│   └── scripts/           # Seeding and schema scripts
+│   │   ├── nodes/             # LangGraph Nodes
+│   │   │   ├── input_guard.py # Safety & Validation
+│   │   │   ├── slot_filling.py# Entity Extraction
+│   │   │   ├── retrieval.py   # Hybrid Retrieval (Neo4j + Qdrant)
+│   │   │   ├── reasoning.py   # Chain-of-Thought Logic
+│   │   │   ├── response.py    # Final Answer Generation
+│   │   │   └── feedback.py    # Human-in-the-Loop Handling
+│   │   ├── api.py             # API Endpoints
+│   │   ├── graph.py           # Main LangGraph Workflow
+│   │   ├── state.py           # State Definition
+│   │   ├── ingestion.py       # Data Ingestion Logic
+│   │   └── domain_config.py   # Domain Specific Config Loader
+│   ├── config/                # YAML Configuration Files
+│   ├── scripts/               # Database Seeding Scripts
+│   └── main.py                # Server Entry Point
 │
-├── hrag-frontend/         # Next.js 14 frontend
-│   ├── app/               # App Router pages
-│   ├── components/        # React components (Copilot, Knowledge, UI)
-│   ├── lib/               # Utilities and API client
-│   └── hooks/             # Custom React hooks
+├── hrag-frontend/             # Next.js 16 frontend
+│   ├── app/                   # App Router (Pages & Layouts)
+│   ├── components/            # React Components
+│   │   ├── copilot/           # Chat Interface & Reasoning UI
+│   │   ├── knowledge/         # Knowledge Base Management
+│   │   └── ui/                # Shared UI Components
+│   ├── lib/                   # Utilities & API Clients
+│   ├── hooks/                 # Custom React Hooks
+│   └── types/                 # TypeScript Definitions
 ```
 
 ## 🧠 LangGraph Flow
