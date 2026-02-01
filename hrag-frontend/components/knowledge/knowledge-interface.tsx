@@ -93,11 +93,22 @@ export function KnowledgeInterface({ addToast }: KnowledgeInterfaceProps) {
     addToast(`Uploading ${file.name}...`, 'info');
 
     try {
-      const response = await apiClient.uploadDocument(file);
+      const response = await apiClient.ingestDocument(file, 'document');
       
-      // Reload tasks to get new entities
+      // Reload data to refresh stats
       await loadData();
-      addToast(`Extracted ${response.entities_extracted} entities from ${file.name}`, 'success');
+      
+      if (response.status === 'success') {
+        addToast(
+          `Ingested ${file.name}: ${response.entities_created} entities, ${response.vectors_created} vectors`, 
+          'success'
+        );
+      } else {
+        addToast(
+          `Partial ingestion: ${response.errors.join(', ')}`, 
+          'info'
+        );
+      }
     } catch (error) {
       console.error('Upload error:', error);
       addToast('Upload failed. Backend service unavailable.', 'error');

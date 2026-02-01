@@ -92,6 +92,16 @@ export interface HealthResponse {
   llm: string;
 }
 
+export interface IngestResponse {
+  file_name: string;
+  domain: string;
+  status: string;
+  entities_created: number;
+  relations_created: number;
+  vectors_created: number;
+  errors: string[];
+}
+
 class HRAGApiClient {
   private baseUrl: string;
 
@@ -228,6 +238,28 @@ class HRAGApiClient {
     if (!response.ok) {
       const error = await response.text();
       throw new Error(`Upload Error: ${response.status} - ${error}`);
+    }
+
+    return response.json();
+  }
+
+  /**
+   * Ingest document with schema-aware ETL pipeline
+   * Automatically extracts entities to Neo4j and vectors to Qdrant
+   */
+  async ingestDocument(file: File, docType: string = 'document'): Promise<IngestResponse> {
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('doc_type', docType);
+
+    const response = await fetch(`${this.baseUrl}/api/ingest`, {
+      method: 'POST',
+      body: formData,
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`Ingest Error: ${response.status} - ${error}`);
     }
 
     return response.json();

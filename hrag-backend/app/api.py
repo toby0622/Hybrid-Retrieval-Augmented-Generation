@@ -87,6 +87,18 @@ class UploadResponse(BaseModel):
     task_ids: List[str]
 
 
+class IngestResponse(BaseModel):
+    """Document ingestion response model"""
+
+    file_name: str
+    domain: str
+    status: str
+    entities_created: int
+    relations_created: int
+    vectors_created: int
+    errors: List[str] = []
+
+
 class HealthResponse(BaseModel):
     """Health check response"""
 
@@ -378,6 +390,46 @@ async def upload_knowledge(
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Upload error: {str(e)}")
+
+
+@app.post("/api/ingest", response_model=IngestResponse)
+async def ingest_document_endpoint(
+    file: UploadFile = File(...),
+    doc_type: str = "document",
+):
+    """
+    Schema-aware document ingestion endpoint.
+    
+    Automatically:
+    1. Detects domain from document content
+    2. Extracts entities using domain schema + LLM
+    3. Writes entities to Neo4j
+    4. Writes document vectors to Qdrant
+    """
+    try:
+        from app.ingestion import ingest_document
+        
+        content = await file.read()
+        content_str = content.decode("utf-8")
+        
+        result = await ingest_document(
+            content=content_str,
+            filename=file.filename,
+            doc_type=doc_type,
+        )
+        
+        return IngestResponse(
+            file_name=file.filename,
+            domain=result.domain,
+            status="success" if result.success else "partial",
+            entities_created=result.entities_created,
+            relations_created=result.relations_created,
+            vectors_created=result.vectors_created,
+            errors=result.errors,
+        )
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Ingestion error: {str(e)}")
 
 
 @app.get("/gardener/tasks", response_model=GardenerTask)
