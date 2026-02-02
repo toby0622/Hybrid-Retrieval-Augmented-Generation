@@ -114,39 +114,70 @@ async def startup_event():
 
 @app.get("/health", response_model=HealthResponse)
 async def health_check():
-    neo4j_status = "disconnected"
-    qdrant_status = "disconnected"
+    import asyncio
+    from concurrent.futures import ThreadPoolExecutor
+
+    async def check_service(check_func, timeout=2.0):
+        try:
+            loop = asyncio.get_running_loop()
+            return await asyncio.wait_for(
+                loop.run_in_executor(None, check_func), 
+                timeout=timeout
+            )
+        except asyncio.TimeoutError:
+            return "timeout"
+        except Exception as e:
+            return f"error: {str(e)[:50]}"
+
+    def check_neo4j_sync():
+        try:
+            from neo4j import GraphDatabase
+            driver = GraphDatabase.driver(
+                settings.neo4j_uri, auth=(settings.neo4j_user, settings.neo4j_password)
+            )
+            with driver.session() as session:
+                session.run("RETURN 1")
+            driver.close()
+            return "connected"
+        except Exception as e:
+            return f"error: {str(e)[:50]}"
+
+    def check_qdrant_sync():
+        try:
+            from qdrant_client import QdrantClient
+            client = QdrantClient(host=settings.qdrant_host, port=settings.qdrant_port, timeout=2.0)
+            client.get_collections()
+            return "connected"
+        except Exception as e:
+            return f"error: {str(e)[:50]}"
+
+    def check_llm_sync():
+        try:
+            import httpx
+            # httpx is async capable, but keeping it sync here for uniformity with the thread pool pattern 
+            # or we could use async httpx directly. Let's use async httpx properly if possible, 
+            # but to ensure we don't block, let's just use the sync wrapper or proper async.
+            # actually httpx is already async in the original code? 
+            # Original: async with httpx.AsyncClient... 
+            # So we can keep LLM check async natural.
+            raise NotImplementedError("Use async implementation") 
+        except Exception as e:
+             raise e
+
+    # Execute checks
+    neo4j_status = await check_service(check_neo4j_sync)
+    qdrant_status = await check_service(check_qdrant_sync)
+
+    # LLM Check (Native Async)
     llm_status = "disconnected"
-
-    try:
-        from neo4j import GraphDatabase
-
-        driver = GraphDatabase.driver(
-            settings.neo4j_uri, auth=(settings.neo4j_user, settings.neo4j_password)
-        )
-        with driver.session() as session:
-            session.run("RETURN 1")
-        driver.close()
-        neo4j_status = "connected"
-    except Exception as e:
-        neo4j_status = f"error: {str(e)[:30]}"
-
-    try:
-        from qdrant_client import QdrantClient
-
-        client = QdrantClient(host=settings.qdrant_host, port=settings.qdrant_port)
-        client.get_collections()
-        qdrant_status = "connected"
-    except Exception as e:
-        qdrant_status = f"error: {str(e)[:30]}"
-
     try:
         import httpx
-
-        async with httpx.AsyncClient(timeout=5.0) as client:
+        async with httpx.AsyncClient(timeout=2.0) as client:
             response = await client.get(f"{settings.llm_base_url}/models")
             if response.status_code == 200:
                 llm_status = "connected"
+            else:
+                llm_status = f"error: {response.status_code}"
     except Exception as e:
         llm_status = f"error: {str(e)[:30]}"
 
