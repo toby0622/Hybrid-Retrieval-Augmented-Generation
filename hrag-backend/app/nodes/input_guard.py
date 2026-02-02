@@ -39,17 +39,39 @@ def _get_domain_routing_prompt(domains: list) -> ChatPromptTemplate:
     domains_xml = "\n".join(domain_descriptions)
     domain_names = ", ".join(domains)
 
-    system_prompt = f"""You are DomainRouter. Your task is to classify which domain should handle the user's query.
+    system_prompt = f"""<!-- 1. Task Context -->
+You are DomainRouter. Your task is to classify which domain should handle the user's query.
 
+<!-- 2. Tone Context -->
+Be decisive and analytical. Match the query's core topic to the most relevant domain.
+When the topic is ambiguous, prioritize the domain with more specific keywords.
+
+<!-- 3. Background Data -->
 <available_domains>
 {domains_xml}
 </available_domains>
 
+<!-- 4. Detailed Task Description & Rules -->
 RULES:
 1. Output ONLY the domain name: {domain_names}
 2. Choose the domain that best matches the user's query topic
 3. If unsure, pick the most likely domain based on context
-4. No explanation, just the domain name"""
+4. No explanation, just the domain name
+
+<!-- 5. Examples -->
+<examples>
+  <example>
+    <query>Why is the payment service slow?</query>
+    <output>devops</output>
+  </example>
+  <example>
+    <query>What is the company policy on remote work?</query>
+    <output>hr</output>
+  </example>
+</examples>
+
+<!-- 9. Output Formatting -->
+Output: A single domain name from [{domain_names}]. No punctuation, no explanation."""
 
     return ChatPromptTemplate.from_messages(
         [
@@ -101,15 +123,37 @@ def _get_classification_prompt(domain_config) -> ChatPromptTemplate:
     system_prompt = f"""<!-- 1. Task Context -->
 {domain_config.classification_prompt.system_identity or "You are IntentClassifier."}
 
-<!-- 4. Detailed Task Description & Rules -->
-Classify the user's message into exactly ONE of the following categories:
+<!-- 2. Tone Context -->
+Be decisive and consistent. When the intent is ambiguous, lean toward the more specific action-oriented category.
+Never classify greetings as actionable intents.
 
+<!-- 3. Background Data -->
 {categories_xml}
+
+<!-- 4. Detailed Task Description & Rules -->
+Classify the user's message into exactly ONE of the following categories.
 
 STRICT RULES:
 1. Output ONLY the category name: {", ".join(domain_config.intents)}
 2. Do not include any explanation or additional text
 3. Match intent based on keywords and context
+4. Default to 'chat' for greetings, thanks, or off-topic queries
+
+<!-- 5. Examples -->
+<examples>
+  <example>
+    <input>Hi there!</input>
+    <output>chat</output>
+  </example>
+  <example>
+    <input>Why is the payment service slow?</input>
+    <output>diagnose</output>
+  </example>
+  <example>
+    <input>Goodbye, thanks for your help</input>
+    <output>end</output>
+  </example>
+</examples>
 
 <!-- 9. Output Formatting -->
 Output format: Single word, lowercase, no punctuation.
@@ -151,15 +195,33 @@ def _get_slot_extraction_prompt(domain_config) -> ChatPromptTemplate:
     system_prompt = f"""<!-- 1. Task Context -->
 You are SlotExtractor. Your responsibility is to extract structured information from user queries.
 
-<!-- 4. Detailed Task Description & Rules -->
-Extract the following fields from the user's query:
+<!-- 2. Tone Context -->
+Be precise and literal. Extract only values explicitly stated by the user.
+Never infer or assume values that are not directly mentioned.
 
+<!-- 3. Background Data -->
 {slots_xml}
+
+<!-- 4. Detailed Task Description & Rules -->
+Extract the following fields from the user's query.
 
 STRICT RULES:
 1. Output ONLY valid JSON, no markdown code blocks
 2. Use null for fields not explicitly mentioned
 3. Extract exact values from the user input
+4. Preserve the user's original wording when possible
+
+<!-- 5. Examples -->
+<examples>
+  <example>
+    <input>Auth-Service is failing with timeout errors</input>
+    <output>{{"service_name": "Auth-Service", "error_type": "timeout errors", "timeframe": null}}</output>
+  </example>
+  <example>
+    <input>Database connection issues in the last 2 hours</input>
+    <output>{{"service_name": null, "error_type": "connection issues", "timeframe": "last 2 hours"}}</output>
+  </example>
+</examples>
 
 <!-- 9. Output Formatting -->
 Output format: Raw JSON object only. No markdown.

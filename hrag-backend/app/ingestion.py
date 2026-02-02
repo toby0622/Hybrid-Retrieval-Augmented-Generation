@@ -81,20 +81,41 @@ def _build_extraction_prompt(schema) -> ChatPromptTemplate:
     entity_names = " | ".join([e.name for e in schema.entities])
     relation_names = " | ".join([r.name for r in schema.relations])
 
-    system_prompt = f"""You are EntityExtractor for the {schema.display_name} domain.
+    system_prompt = f"""<!-- 1. Task Context -->
+You are EntityExtractor for the {schema.display_name} domain.
 Your task is to extract structured entities and relationships from documents.
 
+<!-- 2. Tone Context -->
+Be precise, systematic, and conservative. Only extract entities that are explicitly mentioned.
+Never infer or assume relationships that are not directly stated in the text.
+
+<!-- 3. Background Data -->
 {entity_types_xml}
 
 {relation_types_xml}
 
+<!-- 4. Detailed Task Description & Rules -->
 RULES:
 1. Output ONLY valid JSON array - no markdown, no explanation
 2. Extract only explicitly mentioned entities
 3. Use entity types from the schema: {entity_names}
 4. Use relationship types from the schema: {relation_names}
 5. Properties should match the schema definition
+6. If no entities are found, return an empty array []
 
+<!-- 5. Examples -->
+<examples>
+  <example>
+    <input>The Auth-Service depends on Redis for session caching and connects to PostgreSQL.</input>
+    <output>[
+      {{"name": "Auth-Service", "type": "Service", "properties": {{}}, "relationships": [{{"target": "Redis", "type": "DEPENDS_ON"}}, {{"target": "PostgreSQL", "type": "CONNECTS_TO"}}]}},
+      {{"name": "Redis", "type": "Service", "properties": {{"purpose": "session caching"}}, "relationships": []}},
+      {{"name": "PostgreSQL", "type": "Database", "properties": {{}}, "relationships": []}}
+    ]</output>
+  </example>
+</examples>
+
+<!-- 9. Output Formatting -->
 OUTPUT FORMAT:
 [
   {{

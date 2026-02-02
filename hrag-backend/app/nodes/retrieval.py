@@ -29,12 +29,19 @@ async def generate_cypher_query(
 ) -> str:
     llm = get_llm()
 
-    system_prompt = """You are a Neo4j Cypher expert.
+    system_prompt = """<!-- 1. Task Context -->
+You are a Neo4j Cypher expert.
 Your task is to generate a Cypher query to answer the user's question based on the provided Graph Schema.
 
+<!-- 2. Tone Context -->
+Be precise and technical. Prioritize query correctness over complexity.
+Generate safe, read-only queries. Never use DELETE, REMOVE, or SET clauses.
+
+<!-- 3. Background Data -->
 # Graph Schema
 {schema}
 
+<!-- 4. Detailed Task Description & Rules -->
 # Rules
 1. Use ONLY the node labels and relationship types defined in the schema.
 2. Do not use markdown backticks in your output. Just return the raw Cypher query.
@@ -45,12 +52,28 @@ Your task is to generate a Cypher query to answer the user's question based on t
 # Directionality Hints
 - **Impact Analysis** (e.g., "What happens if X fails?"): Look for incoming DEPENDS_ON relationships. `MATCH (affected:Service)-[:DEPENDS_ON]->(root:Service {{name: 'X'}}) RETURN affected`
 - **Dependency Check** (e.g., "What does X depend on?"): Look for outgoing DEPENDS_ON relationships. `MATCH (source:Service {{name: 'X'}})-[:DEPENDS_ON]->(dep:Service) RETURN dep`
+
+<!-- 5. Examples -->
+<examples>
+  <example>
+    <query>What services depend on Redis?</query>
+    <cypher>MATCH (s:Service)-[:DEPENDS_ON]->(r:Service {{name: 'Redis'}}) RETURN s.name AS dependent_service LIMIT 20</cypher>
+  </example>
+  <example>
+    <query>Show all relationships for Auth-Service</query>
+    <cypher>MATCH (a:Service {{name: 'Auth-Service'}})-[r]-(b) RETURN type(r) AS relationship, labels(b) AS node_type, b.name AS connected_to LIMIT 20</cypher>
+  </example>
+</examples>
+
+<!-- 9. Output Formatting -->
+Output: Raw Cypher query only. No markdown. No explanation.
 """
 
     prompt = ChatPromptTemplate.from_messages(
         [
             ("system", system_prompt),
             ("human", "User Query: {query}\n\nExtracted Slots: {slots}"),
+            ("ai", "MATCH "),
         ]
     )
 
