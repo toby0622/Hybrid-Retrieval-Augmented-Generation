@@ -27,6 +27,8 @@ This project implements a "Human-in-the-Loop" architecture for incident manageme
 │   │   ├── graph.py           # Main LangGraph Workflow
 │   │   ├── state.py           # State Definition
 │   │   ├── ingestion.py       # Data Ingestion Logic
+│   │   ├── mcp_client.py      # MCP Database Client (Real-time Data)
+│   │   ├── schema_registry.py # Dynamic Domain Schema Registry
 │   │   └── domain_config.py   # Domain Specific Config Loader
 │   ├── config/                # YAML Configuration Files
 │   ├── scripts/               # Database Seeding Scripts
@@ -53,8 +55,9 @@ The backend agent follows a structured reasoning flow:
 4.  **Retrieval**: Fetches context from:
     *   **Neo4j**: For service dependencies and topology.
     *   **Qdrant**: For historical logs and similar past incidents.
-5.  **Reasoning**: Analyzes retrieved data to form a hypothesis.
-6.  **Response**: Generates a final diagnostic or resolution plan.
+5.  **Real-time Data (MCP)**: Queries live SQL databases for metrics, logs, and health status.
+6.  **Reasoning**: Analyzes retrieved data to form a hypothesis.
+7.  **Response**: Generates a final diagnostic or resolution plan.
 
 ## ⚙️ Domain Configuration
 

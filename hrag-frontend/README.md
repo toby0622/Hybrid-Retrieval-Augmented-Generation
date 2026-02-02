@@ -6,6 +6,7 @@ The frontend for the **DevOps Incident Response Copilot**, built with **Next.js 
 
 - **Incident Copilot**: Chat interface with streaming reasoning steps and diagnostic cards.
 - **Knowledge Base**: Drag-and-drop ingestion of logs and docs.
+- **Knowledge Base Manager**: Visual interface to view, edit, and manage indexed Documents (Qdrant) and Graph Nodes (Neo4j).
 - **Gardener Interface**: Human-in-the-Loop review for entity conflicts.
 - **Dynamic UI**: Responsive design with dark mode, glassmorphism, and animations.
 

@@ -1,6 +1,6 @@
 # HRAG Backend
 
-The backend for the Hybrid RAG DevOps Copilot, built with FastAPI, LangGraph, Neo4j, and Qdrant.
+The backend for the Hybrid RAG DevOps Copilot, built with FastAPI, LangGraph, Neo4j, and Qdrant. Now featuring **MCP (Model Context Protocol)** for real-time data and a **Dynamic Schema Registry**.
 
 ## 🛠️ Prerequisites
 
@@ -8,6 +8,7 @@ The backend for the Hybrid RAG DevOps Copilot, built with FastAPI, LangGraph, Ne
 - **Neo4j Database** (Local or Aura)
 - **Qdrant Instance** (Local or Cloud)
 - **Google Gemini API Key** (or other LLM provider)
+- **PostgreSQL Database** (for MCP Real-time data simulation)
 
 ## 📦 Installation
 
@@ -53,6 +54,14 @@ The backend for the Hybrid RAG DevOps Copilot, built with FastAPI, LangGraph, Ne
     API_HOST=0.0.0.0
     API_PORT=8000
     DEBUG=true
+
+    # MCP Configuration (Real-time Data)
+    MCP_ENABLED=true
+    MCP_DB_HOST=localhost
+    MCP_DB_PORT=5432
+    MCP_DB_NAME=devops_metrics
+    MCP_DB_USER=postgres
+    MCP_DB_PASSWORD=password
     ```
 
 ## 🗄️ Database Seeding
