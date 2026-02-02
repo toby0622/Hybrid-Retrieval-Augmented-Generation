@@ -35,8 +35,10 @@ export function DynamicReasoning({ steps, isStreaming = false }: DynamicReasonin
       </div>
       <div className="space-y-2">
         {displayedSteps.map((step) => {
-          const isActive = step.status === 'active' || step.status === 'pending';
+          const isActive = step.status === 'active';
           const isCompleted = step.status === 'completed';
+          // If neither active nor completed, it's pending (or unknown)
+          const isPending = !isActive && !isCompleted;
           
           return (
             <div 
@@ -45,12 +47,21 @@ export function DynamicReasoning({ steps, isStreaming = false }: DynamicReasonin
             >
               {isCompleted ? (
                 <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-              ) : (
+              ) : isActive ? (
                 <div className="w-4 h-4 flex items-center justify-center">
                   <div className="w-3 h-3 border-2 border-blue-400 border-t-transparent rounded-full animate-spin" />
                 </div>
+              ) : (
+                <div className="w-4 h-4 flex items-center justify-center">
+                  <div className="w-1.5 h-1.5 rounded-full bg-slate-700" />
+                </div>
               )}
-              <span className={isCompleted ? 'text-slate-400' : 'text-slate-200 font-medium'}>
+              
+              <span className={
+                isCompleted ? 'text-slate-400' : 
+                isActive ? 'text-blue-200 font-medium' : 
+                'text-slate-600'
+              }>
                 {step.label}
               </span>
             </div>
