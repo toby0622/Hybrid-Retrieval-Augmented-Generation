@@ -180,7 +180,7 @@ export function ChatInterface({ addToast }: ChatInterfaceProps) {
       <div className="h-16 border-b border-slate-800 flex items-center px-6 bg-slate-950/80 backdrop-blur-sm z-10 sticky top-0">
         <div>
           <h2 className="text-lg font-bold text-slate-100 flex items-center gap-2">
-            Incident Response Copilot
+            iDoctor Copilot
             {isConnected === null ? (
               <span className="text-xs font-normal px-2 py-0.5 rounded-full bg-slate-500/10 text-slate-400 border border-slate-500/20">
                 <Loader2 className="w-3 h-3 inline animate-spin mr-1" /> Connecting...
@@ -196,11 +196,6 @@ export function ChatInterface({ addToast }: ChatInterfaceProps) {
             )}
           </h2>
           <p className="text-xs text-slate-500">Retrieval: Hybrid (Graph + Vector) • Model: {modelName}</p>
-        </div>
-        <div className="ml-auto flex items-center gap-3">
-          <div className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-900 rounded-md border border-slate-800 text-xs text-slate-400 hover:border-slate-600 transition-colors cursor-help" title="Connection Status">
-            <Database className="w-3 h-3" /> API: localhost:8000
-          </div>
         </div>
       </div>
 
