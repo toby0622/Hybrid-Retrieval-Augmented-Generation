@@ -29,7 +29,7 @@ export function DynamicReasoning({ steps, isStreaming = false }: DynamicReasonin
     displayedSteps.every(s => s.status === 'completed');
 
   return (
-    <div className="bg-slate-900 rounded-lg p-4 border border-slate-800 w-full shadow-inner">
+    <div className="bg-slate-900 rounded-lg p-4 border border-slate-800 w-fit shadow-inner">
       <div className="flex items-center gap-2 text-xs font-semibold text-blue-400 mb-3 uppercase tracking-wider">
         <Activity className="w-3 h-3 animate-pulse" /> REASONING PROCESS
       </div>
