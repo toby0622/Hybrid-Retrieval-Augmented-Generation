@@ -26,6 +26,14 @@ class Settings(BaseSettings):
     scripts_path: str = "scripts"
     domains_path: str = "config/domains"
 
+    # MCP Database Configuration (PostgreSQL)
+    mcp_db_host: str = "localhost"
+    mcp_db_port: int = 5432
+    mcp_db_name: str = "hrag_mcp"
+    mcp_db_user: str = "postgres"
+    mcp_db_password: str = "postgres"
+    mcp_enabled: bool = True
+
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"

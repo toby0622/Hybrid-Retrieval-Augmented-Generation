@@ -104,8 +104,8 @@ Structure your response as follows:
     )
 
 
-async def mcp_tool_node(state: GraphState) -> GraphState:
-    return {**state, "mcp_results": []}
+
+
 
 
 async def reasoning_node(state: GraphState) -> GraphState:
@@ -158,7 +158,7 @@ async def reasoning_node(state: GraphState) -> GraphState:
         llm_analysis = f"Analysis error: {e}"
 
     diagnostic = _parse_diagnostic_response(
-        llm_analysis, query, graph_results=graph_results, vector_results=vector_results
+        llm_analysis, query, graph_results=graph_results, vector_results=vector_results, mcp_results=mcp_results
     )
 
     return {
@@ -187,10 +187,12 @@ def _parse_diagnostic_response(
     query: str,
     graph_results: List[dict] = None,
     vector_results: List[dict] = None,
+    mcp_results: List[dict] = None,
 ) -> DiagnosticResponse:
     steps = []
     graph_results = graph_results or []
     vector_results = vector_results or []
+    mcp_results = mcp_results or []
 
     if graph_results:
         graph_summary_parts = []
@@ -272,6 +274,44 @@ def _parse_diagnostic_response(
                 source="Vector Search",
                 title="Semantic Search (0 matches)",
                 detail="No relevant documents found.",
+                status="warning",
+                is_parallel=True,
+            )
+        )
+
+    if mcp_results:
+        mcp_summary_parts = []
+        for r in mcp_results[:5]:
+            title = r.get("title", "Real-time Data")
+            content = r.get("content", "")
+            mcp_summary_parts.append(f"• {title}: {content[:80]}..." if len(content) > 80 else f"• {title}: {content}")
+
+        mcp_summary = "\n".join(mcp_summary_parts)
+
+        steps.append(
+            DiagnosticStep(
+                id="mcp",
+                source="MCP Tool",
+                title=f"Real-time Data ({len(mcp_results)} results)",
+                detail=mcp_summary,
+                status="info",
+                is_parallel=True,
+                raw_content={
+                    "type": "log",
+                    "data": [
+                        {"title": r.get("title"), "content": r.get("content")}
+                        for r in mcp_results
+                    ],
+                },
+            )
+        )
+    else:
+        steps.append(
+            DiagnosticStep(
+                id="mcp",
+                source="MCP Tool",
+                title="Real-time Data (0 results)",
+                detail="No real-time data available.",
                 status="warning",
                 is_parallel=True,
             )

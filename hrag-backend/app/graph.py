@@ -1,6 +1,7 @@
 from app.nodes.feedback import feedback_node, route_after_feedback
 from app.nodes.input_guard import input_guard_node, route_after_guard
-from app.nodes.reasoning import mcp_tool_node, reasoning_node
+from app.nodes.mcp_tools import mcp_tool_node
+from app.nodes.reasoning import reasoning_node
 from app.nodes.response import (chat_response_node,
                                 clarification_response_node,
                                 diagnostic_response_node,
