@@ -98,6 +98,18 @@ export interface IngestResponse {
   errors: string[];
 }
 
+export interface DocumentChunk {
+  id: string | number;
+  content: string;
+  metadata: {
+    title?: string;
+    doc_type?: string;
+    domain?: string;
+    chunk_index?: number;
+    [key: string]: unknown;
+  };
+}
+
 class HRAGApiClient {
   private baseUrl: string;
 
@@ -258,6 +270,22 @@ class HRAGApiClient {
         action,
         modified_entity: modifiedEntity,
       }),
+    });
+  }
+  async getDocuments(limit: number = 50, offset?: string): Promise<DocumentChunk[]> {
+    const params = new URLSearchParams({ limit: limit.toString() });
+    if (offset) params.append('offset', offset);
+    return this.request<DocumentChunk[]>(`/documents?${params.toString()}`);
+  }
+
+  async getDocument(id: string | number): Promise<DocumentChunk> {
+    return this.request<DocumentChunk>(`/documents/${id}`);
+  }
+
+  async updateDocument(id: string | number, content: string): Promise<{ status: string; message: string }> {
+    return this.request(`/documents/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify({ content }),
     });
   }
 }

@@ -445,3 +445,152 @@ async def get_stats():
         "pending_tasks": len(gardener_tasks),
         "active_threads": 0,
     }
+
+
+class DocumentResponse(BaseModel):
+    id: str | int
+    content: str
+    metadata: dict
+
+
+class UpdateDocumentRequest(BaseModel):
+    content: str
+
+
+@app.get("/documents", response_model=List[DocumentResponse])
+async def list_documents(limit: int = 50, offset: Optional[str] = None):
+    try:
+        from qdrant_client import QdrantClient
+        from qdrant_client.models import Record
+
+        client = QdrantClient(host=settings.qdrant_host, port=settings.qdrant_port)
+        
+        # Use scroll API to list points
+        # offset in qdrant scroll is a point ID to start from
+        scroll_filter = None
+        
+        records, next_page_offset = client.scroll(
+            collection_name=settings.qdrant_collection,
+            scroll_filter=scroll_filter,
+            limit=limit,
+            offset=offset,
+            with_payload=True,
+            with_vectors=False
+        )
+        
+        documents = []
+        for record in records:
+            payload = record.payload or {}
+            content = payload.get("content", "")
+            # Remove content from metadata to avoid duplication in response if desired, 
+            # but keeping it simple for now.
+            documents.append(DocumentResponse(
+                id=record.id,
+                content=content,
+                metadata=payload
+            ))
+            
+        return documents
+    except Exception as e:
+        print(f"Error listing documents: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/documents/{doc_id}", response_model=DocumentResponse)
+async def get_document(doc_id: str):
+    try:
+        from qdrant_client import QdrantClient
+        
+        client = QdrantClient(host=settings.qdrant_host, port=settings.qdrant_port)
+        
+        # doc_id might be int or uuid string. Qdrant IDs can be both.
+        # Try to parse as int if it looks like one, otherwise keep as string
+        try:
+            point_id = int(doc_id)
+        except ValueError:
+            point_id = doc_id
+
+        points = client.retrieve(
+            collection_name=settings.qdrant_collection,
+            ids=[point_id],
+            with_payload=True,
+            with_vectors=False
+        )
+        
+        if not points:
+            raise HTTPException(status_code=404, detail="Document not found")
+            
+        point = points[0]
+        payload = point.payload or {}
+        
+        return DocumentResponse(
+            id=point.id,
+            content=payload.get("content", ""),
+            metadata=payload
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error getting document: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.put("/documents/{doc_id}")
+async def update_document(doc_id: str, request: UpdateDocumentRequest):
+    try:
+        from qdrant_client import QdrantClient
+        from qdrant_client.models import PointStruct
+        from app.ingestion import get_embedding
+        
+        client = QdrantClient(host=settings.qdrant_host, port=settings.qdrant_port)
+        
+        try:
+            point_id = int(doc_id)
+        except ValueError:
+            point_id = doc_id
+            
+        # 1. Retrieve existing payload to preserve metadata (like filename, domain, etc.)
+        points = client.retrieve(
+            collection_name=settings.qdrant_collection,
+            ids=[point_id],
+            with_payload=True,
+            with_vectors=False
+        )
+        
+        if not points:
+            raise HTTPException(status_code=404, detail="Document not found")
+            
+        existing_payload = points[0].payload or {}
+        
+        # 2. Update content in payload
+        existing_payload["content"] = request.content
+        
+        # 3. Generate new embedding
+        # We need to reconstruct the text used for embedding. 
+        # Usually it's "Title \n\n Content" or just Content.
+        # In ingestion.py: embed_text = f"{filename}\n\n{chunk}"
+        # We try to replicate that if title exists
+        filename = existing_payload.get("title", "")
+        embed_text = f"{filename}\n\n{request.content}" if filename else request.content
+        
+        new_embedding = await get_embedding(embed_text)
+        
+        # 4. Upsert (Overwrite)
+        client.upsert(
+            collection_name=settings.qdrant_collection,
+            points=[
+                PointStruct(
+                    id=point_id,
+                    vector=new_embedding,
+                    payload=existing_payload
+                )
+            ]
+        )
+        
+        return {"status": "success", "message": "Document updated and re-indexed"}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error updating document: {e}")
+        raise HTTPException(status_code=500, detail=str(e))

@@ -5,6 +5,7 @@ import { FileText, Network, AlertTriangle, CheckCircle2, RefreshCw, Loader2 } fr
 import { Card, CardContent } from '@/components/ui/card';
 import { UploadZone } from './upload-zone';
 import { EntityCard } from './entity-card';
+import { DocumentBrowser } from './document-browser';
 import { GardenerTask } from '@/types';
 import { apiClient, GardenerTask as ApiGardenerTask } from '@/lib/api';
 
@@ -21,6 +22,7 @@ export function KnowledgeInterface({ addToast }: KnowledgeInterfaceProps) {
     knowledgeNodes: 0,
     pendingTasks: 0
   });
+  const [isDocumentBrowserOpen, setIsDocumentBrowserOpen] = useState(false);
 
   useEffect(() => {
     loadData();
@@ -119,16 +121,19 @@ export function KnowledgeInterface({ addToast }: KnowledgeInterfaceProps) {
         <h2 className="text-2xl font-bold text-slate-100 mb-6">Knowledge Base Ingestion</h2>
         
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-          <Card>
+          <Card 
+            className="cursor-pointer hover:bg-slate-900/50 transition-colors group relative"
+            onClick={() => setIsDocumentBrowserOpen(true)}
+          >
             <CardContent className="p-4 flex items-center gap-4">
-              <div className="p-3 bg-blue-500/10 rounded-lg text-blue-400">
+              <div className="p-3 bg-blue-500/10 rounded-lg text-blue-400 group-hover:bg-blue-500/20 transition-colors">
                 <FileText className="w-6 h-6" />
               </div>
               <div>
                 <div className="text-2xl font-bold text-slate-200">
                   {isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : stats.indexedDocuments.toLocaleString()}
                 </div>
-                <div className="text-xs text-slate-500">Indexed Documents</div>
+                <div className="text-xs text-slate-500 group-hover:text-blue-400 transition-colors">Indexed Documents (Click to view)</div>
               </div>
             </CardContent>
           </Card>
@@ -203,6 +208,12 @@ export function KnowledgeInterface({ addToast }: KnowledgeInterfaceProps) {
           </div>
         )}
       </div>
+
+      <DocumentBrowser 
+        isOpen={isDocumentBrowserOpen} 
+        onClose={() => setIsDocumentBrowserOpen(false)} 
+        addToast={addToast} 
+      />
     </div>
   );
 }
