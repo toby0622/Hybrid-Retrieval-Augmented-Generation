@@ -110,6 +110,12 @@ export interface DocumentChunk {
   };
 }
 
+export interface NodeEntity {
+  id: string;
+  labels: string[];
+  properties: Record<string, unknown>;
+}
+
 class HRAGApiClient {
   private baseUrl: string;
 
@@ -286,6 +292,21 @@ class HRAGApiClient {
     return this.request(`/documents/${id}`, {
       method: 'PUT',
       body: JSON.stringify({ content }),
+    });
+  }
+
+  async getNodes(limit: number = 50, offset: number = 0): Promise<NodeEntity[]> {
+    return this.request<NodeEntity[]>(`/nodes?limit=${limit}&offset=${offset}`);
+  }
+
+  async getNode(id: string): Promise<NodeEntity> {
+    return this.request<NodeEntity>(`/nodes/${id}`);
+  }
+
+  async updateNode(id: string, properties: Record<string, unknown>): Promise<{ status: string; message: string }> {
+    return this.request(`/nodes/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify({ properties }),
     });
   }
 }

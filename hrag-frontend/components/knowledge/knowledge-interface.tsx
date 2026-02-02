@@ -6,6 +6,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { UploadZone } from './upload-zone';
 import { EntityCard } from './entity-card';
 import { DocumentBrowser } from './document-browser';
+import { NodeBrowser } from './node-browser';
 import { GardenerTask } from '@/types';
 import { apiClient, GardenerTask as ApiGardenerTask } from '@/lib/api';
 
@@ -23,6 +24,7 @@ export function KnowledgeInterface({ addToast }: KnowledgeInterfaceProps) {
     pendingTasks: 0
   });
   const [isDocumentBrowserOpen, setIsDocumentBrowserOpen] = useState(false);
+  const [isNodeBrowserOpen, setIsNodeBrowserOpen] = useState(false);
 
   useEffect(() => {
     loadData();
@@ -138,16 +140,19 @@ export function KnowledgeInterface({ addToast }: KnowledgeInterfaceProps) {
             </CardContent>
           </Card>
           
-          <Card>
+          <Card
+            className="cursor-pointer hover:bg-slate-900/50 transition-colors group relative"
+            onClick={() => setIsNodeBrowserOpen(true)}
+          >
             <CardContent className="p-4 flex items-center gap-4">
-              <div className="p-3 bg-purple-500/10 rounded-lg text-purple-400">
+              <div className="p-3 bg-purple-500/10 rounded-lg text-purple-400 group-hover:bg-purple-500/20 transition-colors">
                 <Network className="w-6 h-6" />
               </div>
               <div>
                 <div className="text-2xl font-bold text-slate-200">
                   {isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : stats.knowledgeNodes.toLocaleString()}
                 </div>
-                <div className="text-xs text-slate-500">Knowledge Nodes</div>
+                <div className="text-xs text-slate-500 group-hover:text-purple-400 transition-colors">Knowledge Nodes (Click to view)</div>
               </div>
             </CardContent>
           </Card>
@@ -213,6 +218,12 @@ export function KnowledgeInterface({ addToast }: KnowledgeInterfaceProps) {
         isOpen={isDocumentBrowserOpen} 
         onClose={() => setIsDocumentBrowserOpen(false)} 
         addToast={addToast} 
+      />
+
+      <NodeBrowser
+        isOpen={isNodeBrowserOpen}
+        onClose={() => setIsNodeBrowserOpen(false)}
+        addToast={addToast}
       />
     </div>
   );

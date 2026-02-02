@@ -457,6 +457,16 @@ class UpdateDocumentRequest(BaseModel):
     content: str
 
 
+class NodeResponse(BaseModel):
+    id: str
+    labels: List[str]
+    properties: dict
+
+
+class UpdateNodeRequest(BaseModel):
+    properties: dict
+
+
 @app.get("/documents", response_model=List[DocumentResponse])
 async def list_documents(limit: int = 50, offset: Optional[str] = None):
     try:
@@ -593,4 +603,139 @@ async def update_document(doc_id: str, request: UpdateDocumentRequest):
         raise
     except Exception as e:
         print(f"Error updating document: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/nodes", response_model=List[NodeResponse])
+async def list_nodes(limit: int = 50, offset: int = 0):
+    try:
+        from neo4j import GraphDatabase
+
+        driver = GraphDatabase.driver(
+            settings.neo4j_uri, auth=(settings.neo4j_user, settings.neo4j_password)
+        )
+        
+        nodes = []
+        with driver.session() as session:
+            try:
+                result = session.run(
+                    "MATCH (n) RETURN n, elementId(n) as eid ORDER BY eid SKIP $img_offset LIMIT $img_limit",
+                    img_offset=offset, img_limit=limit
+                )
+                for record in result:
+                    node = record["n"]
+                    nodes.append(NodeResponse(
+                        id=record["eid"],
+                        labels=list(node.labels),
+                        properties=dict(node)
+                    ))
+            except Exception:
+                result = session.run(
+                    "MATCH (n) RETURN n, id(n) as nid ORDER BY nid SKIP $img_offset LIMIT $img_limit",
+                    img_offset=offset, img_limit=limit
+                )
+                for record in result:
+                    node = record["n"]
+                    nodes.append(NodeResponse(
+                        id=str(record["nid"]),
+                        labels=list(node.labels),
+                        properties=dict(node)
+                    ))
+                    
+        driver.close()
+        return nodes
+    except Exception as e:
+        print(f"Error listing nodes: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/nodes/{node_id}", response_model=NodeResponse)
+async def get_node(node_id: str):
+    try:
+        from neo4j import GraphDatabase
+
+        driver = GraphDatabase.driver(
+            settings.neo4j_uri, auth=(settings.neo4j_user, settings.neo4j_password)
+        )
+        
+        with driver.session() as session:
+            result = session.run(
+                "MATCH (n) WHERE elementId(n) = $node_id RETURN n, elementId(n) as eid",
+                node_id=node_id
+            )
+            record = result.single()
+            
+            if not record:
+                if node_id.isdigit():
+                    result = session.run(
+                        "MATCH (n) WHERE id(n) = $node_id RETURN n, id(n) as nid",
+                        node_id=int(node_id)
+                    )
+                    record = result.single()
+
+            if not record:
+                driver.close()
+                raise HTTPException(status_code=404, detail="Node not found")
+                
+            node = record["n"]
+            response_id = record.get("eid") or str(record.get("nid"))
+            
+            response = NodeResponse(
+                id=response_id,
+                labels=list(node.labels),
+                properties=dict(node)
+            )
+            
+        driver.close()
+        return response
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error getting node: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.put("/nodes/{node_id}")
+async def update_node(node_id: str, request: UpdateNodeRequest):
+    try:
+        from neo4j import GraphDatabase
+
+        driver = GraphDatabase.driver(
+            settings.neo4j_uri, auth=(settings.neo4j_user, settings.neo4j_password)
+        )
+        
+        with driver.session() as session:
+            query = ""
+            if node_id.isdigit():
+                 query = """
+                 MATCH (n)
+                 WHERE elementId(n) = $node_id OR id(n) = $int_id
+                 SET n += $props
+                 RETURN n
+                 """
+            else:
+                 query = """
+                 MATCH (n)
+                 WHERE elementId(n) = $node_id
+                 SET n += $props
+                 RETURN n
+                 """
+            
+            params = {
+                "node_id": node_id, 
+                "int_id": int(node_id) if node_id.isdigit() else -1,
+                "props": request.properties
+            }
+            
+            result = session.run(query, params)
+            if not result.single():
+                 driver.close()
+                 raise HTTPException(status_code=404, detail="Node not found")
+                 
+        driver.close()
+        return {"status": "success", "message": "Node updated"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error updating node: {e}")
         raise HTTPException(status_code=500, detail=str(e))
