@@ -29,6 +29,7 @@ export function ChatInterface({ addToast }: ChatInterfaceProps) {
   const [threadId, setThreadId] = useState<string | null>(null);
   const [isConnected, setIsConnected] = useState<boolean | null>(null);
   const [healthInfo, setHealthInfo] = useState<{neo4j: string, qdrant: string, llm: string} | null>(null);
+  const [modelName, setModelName] = useState<string>('Loading...');
   
   const [streamingSteps, setStreamingSteps] = useState<ReasoningStep[]>([]);
   const [isStreaming, setIsStreaming] = useState(false);
@@ -46,6 +47,7 @@ export function ChatInterface({ addToast }: ChatInterfaceProps) {
         const isHealthy = health.status === 'healthy' || health.status === 'degraded';
         setIsConnected(isHealthy);
         setHealthInfo({ neo4j: health.neo4j, qdrant: health.qdrant, llm: health.llm });
+        setModelName(health.model_name || 'Unknown');
         setMessages([{
           id: 1,
           role: 'system',
@@ -193,7 +195,7 @@ export function ChatInterface({ addToast }: ChatInterfaceProps) {
               </span>
             )}
           </h2>
-          <p className="text-xs text-slate-500">Retrieval: Hybrid (Graph + Vector) • Model: gemma-3-27b</p>
+          <p className="text-xs text-slate-500">Retrieval: Hybrid (Graph + Vector) • Model: {modelName}</p>
         </div>
         <div className="ml-auto flex items-center gap-3">
           <div className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-900 rounded-md border border-slate-800 text-xs text-slate-400 hover:border-slate-600 transition-colors cursor-help" title="Connection Status">

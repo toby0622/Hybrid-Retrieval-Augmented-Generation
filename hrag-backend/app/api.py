@@ -80,6 +80,7 @@ class HealthResponse(BaseModel):
     neo4j: str
     qdrant: str
     llm: str
+    model_name: str
 
 
 app = FastAPI(
@@ -156,7 +157,7 @@ async def health_check():
     )
 
     return HealthResponse(
-        status=overall_status, neo4j=neo4j_status, qdrant=qdrant_status, llm=llm_status
+        status=overall_status, neo4j=neo4j_status, qdrant=qdrant_status, llm=llm_status, model_name=settings.llm_model_name
     )
 
 

@@ -85,6 +85,7 @@ export interface HealthResponse {
   neo4j: string;
   qdrant: string;
   llm: string;
+  model_name: string;
 }
 
 export interface IngestResponse {
