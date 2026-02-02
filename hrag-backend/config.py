@@ -10,6 +10,10 @@ class Settings(BaseSettings):
     llm_model_name: str = "google/gemma-3-27b"
     embedding_model_name: str = "text-embedding-embeddinggemma-300m"
 
+    token_url: Optional[str] = None
+    j1_token: Optional[str] = None
+    token_enabled: bool = False
+
     neo4j_uri: str = "bolt://localhost:7687"
     neo4j_user: str = "neo4j"
     neo4j_password: str = "password"

@@ -1,17 +1,9 @@
 from app.domain_init import get_active_domain
+from app.llm_factory import get_llm
 from app.state import DiagnosticResponse, GraphState, Message
 from config import settings
 from langchain_core.prompts import ChatPromptTemplate
-from langchain_openai import ChatOpenAI
 
-
-def get_llm():
-    return ChatOpenAI(
-        base_url=settings.llm_base_url,
-        api_key=settings.llm_api_key,
-        model=settings.llm_model_name,
-        temperature=0.7,
-    )
 
 
 def _get_chat_prompt(domain_config) -> ChatPromptTemplate:

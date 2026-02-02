@@ -4,19 +4,11 @@ from typing import Literal, Optional
 from app.domain_config import DomainRegistry
 from app.domain_init import (get_active_domain, list_available_domains,
                              switch_domain)
+from app.llm_factory import get_llm
 from app.state import DynamicSlotInfo, GraphState, SlotInfo
 from config import settings
 from langchain_core.prompts import ChatPromptTemplate
-from langchain_openai import ChatOpenAI
 
-
-def get_llm():
-    return ChatOpenAI(
-        base_url=settings.llm_base_url,
-        api_key=settings.llm_api_key,
-        model=settings.llm_model_name,
-        temperature=0.1,
-    )
 
 
 def _get_domain_routing_prompt(domains: list) -> ChatPromptTemplate:

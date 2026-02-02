@@ -3,25 +3,17 @@ from typing import Any, List, Optional
 
 import httpx
 from app.domain_init import get_active_domain
+from app.llm_factory import get_llm
 from app.schema_registry import SchemaRegistry
+from app.services.auth import token_manager
 from app.state import DynamicSlotInfo, GraphState, RetrievalResult, SlotInfo
 from config import settings
 from langchain_core.prompts import ChatPromptTemplate
-from langchain_openai import ChatOpenAI
 from neo4j import AsyncGraphDatabase
 from qdrant_client import QdrantClient
 from qdrant_client.models import FieldCondition, Filter, MatchText
 
 EMBEDDING_DIM = 768
-
-
-def get_llm():
-    return ChatOpenAI(
-        base_url=settings.llm_base_url,
-        api_key=settings.llm_api_key,
-        model=settings.llm_model_name,
-        temperature=0.0,
-    )
 
 
 async def generate_cypher_query(
@@ -131,10 +123,17 @@ class QdrantClientWrapper:
 
 async def get_embedding(text: str) -> List[float]:
     async with httpx.AsyncClient(timeout=30.0) as client:
+        headers = {"Authorization": f"Bearer {settings.llm_api_key}"}
+        
+        if settings.token_enabled:
+            token = token_manager.get_token()
+            if token:
+                headers["Authorization"] = token
+
         response = await client.post(
             f"{settings.llm_base_url}/embeddings",
             json={"model": settings.embedding_model_name, "input": text},
-            headers={"Authorization": f"Bearer {settings.llm_api_key}"},
+            headers=headers,
         )
         response.raise_for_status()
         data = response.json()
