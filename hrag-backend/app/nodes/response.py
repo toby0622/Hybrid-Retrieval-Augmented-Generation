@@ -8,7 +8,7 @@ from langchain_core.prompts import ChatPromptTemplate
 
 def _get_chat_prompt(domain_config) -> ChatPromptTemplate:
     system_prompt = f"""<!-- 1. Task Context -->
-{domain_config.chat_turn_prompt.system_identity or "You are a helpful assistant."}
+{domain_config.chat_prompt.system_identity or "You are a helpful assistant."}
 
 <!-- 2. Tone Context -->
 Be warm, helpful, and approachable while maintaining professionalism.
