@@ -13,11 +13,14 @@ def initialize_domain_system(
 ) -> DomainConfig:
     base_path = Path(__file__).parent.parent
 
+    DEFAULT_SCRIPTS_PATH = "scripts"
+    DEFAULT_DOMAINS_PATH = "config/domains"
+
     if scripts_path is None:
-        scripts_path = base_path / settings.scripts_path
+        scripts_path = base_path / DEFAULT_SCRIPTS_PATH
 
     if domains_path is None:
-        domains_path = base_path / settings.domains_path
+        domains_path = base_path / DEFAULT_DOMAINS_PATH
 
     if active_domain is None:
         active_domain = settings.active_domain
@@ -35,6 +38,11 @@ def initialize_domain_system(
     if not domains:
         raise ValueError(f"No domain configs found in {domains_path}")
 
+    if not active_domain:
+        if domains:
+            print(f"   [INFO] No active domain configured, defaulting to '{domains[0]}'")
+            active_domain = domains[0]
+    
     if active_domain not in domains:
         print(f"   [WARN] Domain '{active_domain}' not found, using first available")
         active_domain = domains[0]
