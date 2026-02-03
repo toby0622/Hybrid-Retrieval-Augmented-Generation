@@ -16,19 +16,16 @@ export function DocumentBrowser({ isOpen, onClose, addToast }: DocumentBrowserPr
   const [offset, setOffset] = useState<string | undefined>(undefined);
   const [selectedDoc, setSelectedDoc] = useState<DocumentChunk | null>(null);
   const [pageHistory, setPageHistory] = useState<string[]>([]);
+  const [searchQuery, setSearchQuery] = useState('');
   
-  const loadDocuments = async (nextOffset?: string) => {
+  const loadDocuments = async (nextOffset?: string, searchTerm?: string) => {
     setIsLoading(true);
     try {
-      const docs = await apiClient.getDocuments(10, nextOffset);
+      const docs = await apiClient.getDocuments(10, nextOffset, searchTerm);
       if (docs.length > 0) {
         setDocuments(docs);
-        // We don't get 'next_offset' wrapper from our simple API currently
-        // Ideally API should return it. For now, we just list what we get.
-        // To implement proper pagination, backend API response structure needs adjustment
-        // or we rely on 'offset' derived from last item ID for next fetch if using Qdrant scroll.
-        // Our backend implementation of /documents returns array directly currently.
-        // Let's assume for this step we just show first 50 or so as implemented in backend default.
+      } else if (searchTerm) {
+          setDocuments([]);
       }
     } catch (error) {
       console.error('Failed to load documents', error);
@@ -40,7 +37,9 @@ export function DocumentBrowser({ isOpen, onClose, addToast }: DocumentBrowserPr
 
   useEffect(() => {
     if (isOpen) {
-      loadDocuments();
+    if (isOpen) {
+      loadDocuments(undefined, searchQuery);
+    }
     }
   }, [isOpen]);
 
@@ -51,7 +50,9 @@ export function DocumentBrowser({ isOpen, onClose, addToast }: DocumentBrowserPr
   const handleEditorClose = (wasUpdated: boolean) => {
     setSelectedDoc(null);
     if (wasUpdated) {
-      loadDocuments(); // Reload to see changes
+    if (wasUpdated) {
+      loadDocuments(undefined, searchQuery); // Reload to see changes
+    }
     }
   };
 
@@ -72,7 +73,20 @@ export function DocumentBrowser({ isOpen, onClose, addToast }: DocumentBrowserPr
               <Search className="w-5 h-5 text-blue-400" />
               Indexed Documents
             </h2>
-            <button 
+            <div className="flex-1 max-w-sm ml-8 mr-4">
+                <div className="relative">
+                    <Search className="absolute left-2 top-2.5 h-4 w-4 text-slate-500" />
+                    <input
+                        type="text"
+                        placeholder="Search content..."
+                        className="w-full bg-slate-950 border border-slate-700 rounded-lg pl-8 pr-4 py-2 text-sm text-slate-200 focus:outline-none focus:border-blue-500 transition-colors"
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        onKeyDown={(e) => e.key === 'Enter' && loadDocuments(undefined, searchQuery)}
+                    />
+                </div>
+            </div>
+            <button  
               onClick={onClose}
               className="p-2 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-white transition-colors"
             >

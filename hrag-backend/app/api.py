@@ -548,17 +548,35 @@ class UpdateNodeRequest(BaseModel):
 
 
 @app.get("/documents", response_model=List[DocumentResponse])
-async def list_documents(limit: int = 50, offset: Optional[str] = None):
+async def list_documents(limit: int = 50, offset: Optional[str] = None, search: Optional[str] = None):
     try:
         from qdrant_client import QdrantClient
-        from qdrant_client.models import Record
+        from qdrant_client.models import Filter, FieldCondition, MatchText
 
         client = QdrantClient(host=settings.qdrant_host, port=settings.qdrant_port)
         
         # Use scroll API to list points
-        # offset in qdrant scroll is a point ID to start from
         scroll_filter = None
         
+        if search:
+            # Create a text match filter on 'content' or 'title'
+            # Note: This requires the field to be indexed as text in Qdrant if using full text match,
+            # or just keyword match if keyword. Default payload index usually works for 'match'.
+            # Let's try matching 'content' or 'title'. Qdrant filter structure:
+            
+            scroll_filter = Filter(
+                should=[
+                    FieldCondition(
+                        key="content",
+                        match=MatchText(text=search)
+                    ),
+                    FieldCondition(
+                        key="title",
+                        match=MatchText(text=search)
+                    )
+                ]
+            )
+
         records, next_page_offset = client.scroll(
             collection_name=settings.qdrant_collection,
             scroll_filter=scroll_filter,
@@ -572,8 +590,6 @@ async def list_documents(limit: int = 50, offset: Optional[str] = None):
         for record in records:
             payload = record.payload or {}
             content = payload.get("content", "")
-            # Remove content from metadata to avoid duplication in response if desired, 
-            # but keeping it simple for now.
             documents.append(DocumentResponse(
                 id=record.id,
                 content=content,
@@ -687,7 +703,7 @@ async def update_document(doc_id: str, request: UpdateDocumentRequest):
 
 
 @app.get("/nodes", response_model=List[NodeResponse])
-async def list_nodes(limit: int = 50, offset: int = 0):
+async def list_nodes(limit: int = 50, offset: int = 0, search: Optional[str] = None):
     try:
         from neo4j import GraphDatabase
 
@@ -698,10 +714,25 @@ async def list_nodes(limit: int = 50, offset: int = 0):
         nodes = []
         with driver.session() as session:
             try:
-                result = session.run(
-                    "MATCH (n) RETURN n, elementId(n) as eid ORDER BY eid SKIP $img_offset LIMIT $img_limit",
-                    img_offset=offset, img_limit=limit
-                )
+                if search:
+                    # Search by name property
+                    query = """
+                    MATCH (n) 
+                    WHERE toLower(n.name) CONTAINS toLower($search)
+                    RETURN n, elementId(n) as eid 
+                    ORDER BY eid 
+                    SKIP $img_offset LIMIT $img_limit
+                    """
+                    result = session.run(
+                        query,
+                        img_offset=offset, img_limit=limit, search=search
+                    )
+                else:
+                    result = session.run(
+                        "MATCH (n) RETURN n, elementId(n) as eid ORDER BY eid SKIP $img_offset LIMIT $img_limit",
+                        img_offset=offset, img_limit=limit
+                    )
+                    
                 for record in result:
                     node = record["n"]
                     nodes.append(NodeResponse(
@@ -710,10 +741,25 @@ async def list_nodes(limit: int = 50, offset: int = 0):
                         properties=serialize_neo4j_properties(dict(node))
                     ))
             except Exception:
-                result = session.run(
-                    "MATCH (n) RETURN n, id(n) as nid ORDER BY nid SKIP $img_offset LIMIT $img_limit",
-                    img_offset=offset, img_limit=limit
-                )
+                # Fallback for older Neo4j versions using id()
+                if search:
+                    query = """
+                    MATCH (n) 
+                    WHERE toLower(n.name) CONTAINS toLower($search)
+                    RETURN n, id(n) as nid 
+                    ORDER BY nid 
+                    SKIP $img_offset LIMIT $img_limit
+                    """
+                    result = session.run(
+                        query,
+                        img_offset=offset, img_limit=limit, search=search
+                    )
+                else:
+                    result = session.run(
+                        "MATCH (n) RETURN n, id(n) as nid ORDER BY nid SKIP $img_offset LIMIT $img_limit",
+                        img_offset=offset, img_limit=limit
+                    )
+                
                 for record in result:
                     node = record["n"]
                     nodes.append(NodeResponse(

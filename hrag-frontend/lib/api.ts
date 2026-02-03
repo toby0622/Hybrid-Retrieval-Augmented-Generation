@@ -278,9 +278,10 @@ class HRAGApiClient {
       }),
     });
   }
-  async getDocuments(limit: number = 50, offset?: string): Promise<DocumentChunk[]> {
+  async getDocuments(limit: number = 50, offset?: string, search?: string): Promise<DocumentChunk[]> {
     const params = new URLSearchParams({ limit: limit.toString() });
     if (offset) params.append('offset', offset);
+    if (search) params.append('search', search);
     return this.request<DocumentChunk[]>(`/documents?${params.toString()}`);
   }
 
@@ -295,8 +296,10 @@ class HRAGApiClient {
     });
   }
 
-  async getNodes(limit: number = 50, offset: number = 0): Promise<NodeEntity[]> {
-    return this.request<NodeEntity[]>(`/nodes?limit=${limit}&offset=${offset}`);
+  async getNodes(limit: number = 50, offset: number = 0, search?: string): Promise<NodeEntity[]> {
+    const params = new URLSearchParams({ limit: limit.toString(), offset: offset.toString() });
+    if (search) params.append('search', search);
+    return this.request<NodeEntity[]>(`/nodes?${params.toString()}`);
   }
 
   async getNode(id: string): Promise<NodeEntity> {

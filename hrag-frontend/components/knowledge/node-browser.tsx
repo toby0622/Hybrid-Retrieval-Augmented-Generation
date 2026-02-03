@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Network, Edit2, X, Loader2 } from 'lucide-react';
+import { Network, Edit2, X, Loader2, Search } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { apiClient, NodeEntity } from '@/lib/api';
 import { NodeEditor } from '@/components/knowledge/node-editor';
@@ -15,12 +15,13 @@ export function NodeBrowser({ isOpen, onClose, addToast }: NodeBrowserProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [offset, setOffset] = useState(0);
   const [selectedNode, setSelectedNode] = useState<NodeEntity | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
 
-  const loadNodes = async (reset = false) => {
+  const loadNodes = async (reset = false, searchTerm?: string) => {
     setIsLoading(true);
     try {
       const currentOffset = reset ? 0 : offset;
-      const fetchedNodes = await apiClient.getNodes(50, currentOffset);
+      const fetchedNodes = await apiClient.getNodes(50, currentOffset, searchTerm);
       if (reset) {
         setNodes(fetchedNodes);
         setOffset(fetchedNodes.length);
@@ -38,7 +39,7 @@ export function NodeBrowser({ isOpen, onClose, addToast }: NodeBrowserProps) {
 
   useEffect(() => {
     if (isOpen) {
-      loadNodes(true);
+      loadNodes(true, searchQuery);
     }
   }, [isOpen]);
 
@@ -49,7 +50,7 @@ export function NodeBrowser({ isOpen, onClose, addToast }: NodeBrowserProps) {
   const handleEditorClose = (wasUpdated: boolean) => {
     setSelectedNode(null);
     if (wasUpdated) {
-      loadNodes(true); // Reload to see changes
+      loadNodes(true, searchQuery); // Reload to see changes
     }
   };
 
@@ -70,6 +71,19 @@ export function NodeBrowser({ isOpen, onClose, addToast }: NodeBrowserProps) {
               <Network className="w-5 h-5 text-purple-400" />
               Knowledge Graph Nodes
             </h2>
+            <div className="flex-1 max-w-sm ml-8 mr-4">
+                <div className="relative">
+                    <Search className="absolute left-2 top-2.5 h-4 w-4 text-slate-500" />
+                    <input
+                        type="text"
+                        placeholder="Search nodes..."
+                        className="w-full bg-slate-950 border border-slate-700 rounded-lg pl-8 pr-4 py-2 text-sm text-slate-200 focus:outline-none focus:border-purple-500 transition-colors"
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        onKeyDown={(e) => e.key === 'Enter' && loadNodes(true, searchQuery)}
+                    />
+                </div>
+            </div>
             <button 
               onClick={onClose}
               className="p-2 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-white transition-colors"
@@ -128,7 +142,7 @@ export function NodeBrowser({ isOpen, onClose, addToast }: NodeBrowserProps) {
           <div className="p-4 border-t border-slate-800 bg-slate-900/50 rounded-b-xl flex justify-between items-center text-xs text-slate-500">
             <div>Showing {nodes.length} nodes</div>
             <button 
-                onClick={() => loadNodes()} 
+                onClick={() => loadNodes(false, searchQuery)} 
                 disabled={isLoading}
                 className="hover:text-purple-400 transition-colors disabled:opacity-50"
             >
