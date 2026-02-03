@@ -68,21 +68,32 @@ export function ChatInterface({ addToast }: ChatInterfaceProps) {
   }, []);
 
   const handleDiagnosticAction = async (actionType: 'case_study' | 'resolve') => {
+    if (!threadId) return;
+
     if (actionType === 'case_study') {
-      addToast('Generated new Case Study draft from incident analysis.', 'success');
-    } else if (actionType === 'resolve') {
-      if (threadId) {
-        try {
-          await apiClient.chat({
-            query: 'Issue resolved',
-            thread_id: threadId,
-            feedback: 'resolved'
-          });
-        } catch (error) {
-          console.error('Feedback error:', error);
-        }
+      try {
+        await apiClient.chat({
+          query: 'Generate case study',
+          thread_id: threadId,
+          feedback: 'generate_case_study'
+        });
+        addToast('Requesting case study generation...', 'info');
+      } catch (error) {
+        console.error('Case study generation error:', error);
+        addToast('Failed to trigger case study generation', 'error');
       }
-      addToast('Incident marked resolved. Feedback loop updated.', 'success');
+    } else if (actionType === 'resolve') {
+      try {
+        await apiClient.chat({
+          query: 'Issue resolved',
+          thread_id: threadId,
+          feedback: 'resolved'
+        });
+        addToast('Incident marked resolved. Feedback loop updated.', 'success');
+      } catch (error) {
+        console.error('Feedback error:', error);
+        addToast('Failed to resolve incident', 'error');
+      }
     }
   };
 

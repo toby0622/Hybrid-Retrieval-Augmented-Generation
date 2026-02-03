@@ -92,6 +92,10 @@ async def feedback_node(state: GraphState) -> GraphState:
     feedback = state.get("feedback")
 
     if feedback == "resolved":
+        # Keep old behavior for now, or unified?
+        # Let's unify it: 'resolved' also generates case study if not already done.
+        return await _generate_case_study(state)
+    elif feedback == "generate_case_study":
         return await _generate_case_study(state)
     elif feedback == "more_info":
         return {**state, "clarification_count": 0}
@@ -100,12 +104,18 @@ async def feedback_node(state: GraphState) -> GraphState:
 
 
 async def _generate_case_study(state: GraphState) -> GraphState:
+    from app.ingestion import ingest_document
+
     slots = state.get("slots", SlotInfo())
     diagnostic = state.get("diagnostic")
     query = state.get("query", "")
 
     if not diagnostic:
-        return {**state, "case_study_generated": False}
+        return {
+            **state, 
+            "case_study_generated": False,
+            "response": "Cannot generate case study: No diagnostic analysis found."
+        }
 
     diagnostic_summary = "\n".join(
         [f"- {step.title}: {step.detail}" for step in diagnostic.path]
@@ -123,12 +133,21 @@ async def _generate_case_study(state: GraphState) -> GraphState:
                 "suggestion": diagnostic.suggestion,
             }
         )
-        case_study = result.content
+        case_study_content = result.content
+        
+        # Ingest the generated case study
+        ingest_result = await ingest_document(
+            content=case_study_content,
+            filename=f"CaseStudy_{slots.service_name}_{slots.error_type}.md",
+            doc_type="case_study"
+        )
+
+        success_msg = f"\n\n**Case Study Generated and Archived**\n- Domain: {ingest_result.domain}\n- Entities: {ingest_result.entities_created}\n- Status: {ingest_result.status}"
 
         return {
             **state,
             "case_study_generated": True,
-            "response": "Case study generated and saved to knowledge base.",
+            "response": case_study_content + success_msg,
         }
 
     except Exception as e:
@@ -136,6 +155,7 @@ async def _generate_case_study(state: GraphState) -> GraphState:
             **state,
             "case_study_generated": False,
             "error": f"Case study generation failed: {e}",
+            "response": f"Failed to generate case study: {e}"
         }
 
 
@@ -143,6 +163,8 @@ def route_after_feedback(state: GraphState) -> str:
     feedback = state.get("feedback")
 
     if feedback == "resolved":
+        return "end"
+    elif feedback == "generate_case_study":
         return "end"
     elif feedback == "more_info":
         return "slot_check"

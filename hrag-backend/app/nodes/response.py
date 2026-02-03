@@ -111,8 +111,18 @@ async def diagnostic_response_node(state: GraphState) -> GraphState:
 async def end_conversation_node(state: GraphState) -> GraphState:
     current_domain = get_active_domain()
     name = current_domain.display_name if current_domain else "the system"
+    
+    goodbye_msg = f"Thank you for using {name}. The conversation has ended. Feel free to start a new conversation anytime!"
+
+    if state.get("case_study_generated"):
+        # Append goodbye to existing response (which contains the case study)
+        current_response = state.get("response", "")
+        return {
+            **state,
+            "response": f"{current_response}\n\n---\n\n{goodbye_msg}"
+        }
 
     return {
         **state,
-        "response": f"Thank you for using {name}. The conversation has ended. Feel free to start a new conversation anytime!",
+        "response": goodbye_msg,
     }
