@@ -202,8 +202,20 @@ async def health_check():
     llm_status = "disconnected"
     try:
         import httpx
+        from app.services.auth import token_manager
+
+        headers = {}
+        if settings.llm_api_key:
+             headers["Authorization"] = f"Bearer {settings.llm_api_key}"
+
+        if settings.token_enabled:
+            loop = asyncio.get_running_loop()
+            token = await loop.run_in_executor(None, token_manager.get_token)
+            if token:
+                headers["Authorization"] = token
+
         async with httpx.AsyncClient(timeout=2.0) as client:
-            response = await client.get(f"{settings.llm_base_url}/models")
+            response = await client.get(f"{settings.llm_base_url}/models", headers=headers)
             if response.status_code == 200:
                 llm_status = "connected"
             else:
