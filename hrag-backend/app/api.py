@@ -4,6 +4,7 @@ import uuid
 from typing import AsyncGenerator, List, Optional
 
 from app.graph import graph, run_query
+from app.logger import logger
 from app.nodes.feedback import check_entity_conflicts, extract_entities_node
 from app.state import DiagnosticResponse, DiagnosticStep, SlotInfo
 from config import settings
@@ -134,12 +135,12 @@ def serialize_neo4j_properties(props: dict) -> dict:
 async def startup_event():
     from app.domain_init import initialize_domain_system
 
-    print("[Startup] Initializing domain system...")
+    logger.info("Initializing domain system...")
     try:
         config = initialize_domain_system()
-        print(f"[Startup] Active domain: {config.display_name}")
+        logger.info(f"Active domain: {config.display_name}")
     except Exception as e:
-        print(f"[Startup] Domain initialization error: {e}")
+        logger.exception(f"Domain initialization error: {e}")
 
 
 @app.get("/health", response_model=HealthResponse)
@@ -157,6 +158,7 @@ async def health_check():
         except asyncio.TimeoutError:
             return "timeout"
         except Exception as e:
+            logger.error(f"Health check service error: {e}")
             return f"error: {str(e)[:50]}"
 
     def check_neo4j_sync():
@@ -170,6 +172,7 @@ async def health_check():
             driver.close()
             return "connected"
         except Exception as e:
+            logger.error(f"Neo4j health check failed: {e}")
             return f"error: {str(e)[:50]}"
 
     def check_qdrant_sync():
@@ -179,6 +182,7 @@ async def health_check():
             client.get_collections()
             return "connected"
         except Exception as e:
+            logger.error(f"Qdrant health check failed: {e}")
             return f"error: {str(e)[:50]}"
 
     def check_llm_sync():
@@ -217,8 +221,10 @@ async def health_check():
                 llm_status = "connected"
             else:
                 llm_status = f"error: {response.status_code}"
+                logger.warning(f"LLM health check failed with status: {response.status_code}")
     except Exception as e:
         llm_status = f"error: {str(e)[:30]}"
+        logger.error(f"LLM health check exception: {e}")
 
     overall_status = (
         "healthy"
@@ -297,7 +303,8 @@ async def chat_stream(request: ChatRequest):
             yield f"data: {json.dumps(response_data)}\n\n"
 
         except Exception as e:
-            yield f"data: {json.dumps({'type': 'error', 'message': str(e)})}\n\n"
+            logger.exception("Error in chat stream generation")
+            yield f"data: {json.dumps({'type': 'error', 'message': 'Internal Server Error'})}\n\n"
 
         yield "data: [DONE]\n\n"
 
@@ -351,7 +358,8 @@ async def chat(request: ChatRequest):
         )
 
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Processing error: {str(e)}")
+        logger.exception(f"Error processing chat request: {e}")
+        raise HTTPException(status_code=500, detail="Internal Server Error")
 
 
 @app.post("/upload", response_model=UploadResponse)
@@ -410,7 +418,8 @@ async def upload_knowledge(
         )
 
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Upload error: {str(e)}")
+        logger.exception(f"Error uploading knowledge file: {e}")
+        raise HTTPException(status_code=500, detail="Internal Server Error")
 
 
 @app.post("/api/ingest", response_model=IngestResponse)
@@ -441,7 +450,8 @@ async def ingest_document_endpoint(
         )
 
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Ingestion error: {str(e)}")
+        logger.exception(f"Error during document ingestion: {e}")
+        raise HTTPException(status_code=500, detail="Internal Server Error")
 
 
 @app.get("/gardener/tasks", response_model=GardenerTask)
@@ -493,7 +503,7 @@ async def get_stats():
                 indexed_documents = info.points_count
                 break
     except Exception as e:
-        print(f"Qdrant stats error: {e}")
+        logger.error(f"Qdrant stats error: {e}")
 
     try:
         from neo4j import GraphDatabase
@@ -507,7 +517,7 @@ async def get_stats():
             knowledge_nodes = record["count"] if record else 0
         driver.close()
     except Exception as e:
-        print(f"Neo4j stats error: {e}")
+        logger.error(f"Neo4j stats error: {e}")
 
     return {
         "indexed_documents": indexed_documents,
@@ -572,8 +582,8 @@ async def list_documents(limit: int = 50, offset: Optional[str] = None):
             
         return documents
     except Exception as e:
-        print(f"Error listing documents: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception(f"Error listing documents: {e}")
+        raise HTTPException(status_code=500, detail="Internal Server Error")
 
 
 @app.get("/documents/{doc_id}", response_model=DocumentResponse)
@@ -611,8 +621,8 @@ async def get_document(doc_id: str):
     except HTTPException:
         raise
     except Exception as e:
-        print(f"Error getting document: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception(f"Error getting document {doc_id}: {e}")
+        raise HTTPException(status_code=500, detail="Internal Server Error")
 
 
 @app.put("/documents/{doc_id}")
@@ -672,8 +682,8 @@ async def update_document(doc_id: str, request: UpdateDocumentRequest):
     except HTTPException:
         raise
     except Exception as e:
-        print(f"Error updating document: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception(f"Error updating document {doc_id}: {e}")
+        raise HTTPException(status_code=500, detail="Internal Server Error")
 
 
 @app.get("/nodes", response_model=List[NodeResponse])
@@ -715,8 +725,8 @@ async def list_nodes(limit: int = 50, offset: int = 0):
         driver.close()
         return nodes
     except Exception as e:
-        print(f"Error listing nodes: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception(f"Error listing nodes: {e}")
+        raise HTTPException(status_code=500, detail="Internal Server Error")
 
 
 @app.get("/nodes/{node_id}", response_model=NodeResponse)
@@ -761,8 +771,8 @@ async def get_node(node_id: str):
     except HTTPException:
         raise
     except Exception as e:
-        print(f"Error getting node: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception(f"Error getting node {node_id}: {e}")
+        raise HTTPException(status_code=500, detail="Internal Server Error")
 
 
 @app.put("/nodes/{node_id}")

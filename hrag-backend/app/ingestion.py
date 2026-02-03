@@ -14,6 +14,7 @@ from langchain_core.prompts import ChatPromptTemplate
 from neo4j import AsyncGraphDatabase
 from qdrant_client import QdrantClient
 from qdrant_client.models import PointStruct
+from app.logger import logger
 
 
 @dataclass
@@ -151,11 +152,11 @@ async def extract_entities_with_schema(content: str, schema) -> List[ExtractedEn
                 )
             )
 
-        print(f"[Ingestion] Extracted {len(entities)} entities")
+        logger.info(f"Extracted {len(entities)} entities")
         return entities
 
     except Exception as e:
-        print(f"[Ingestion] Extraction error: {e}")
+        logger.error(f"Extraction error: {e}")
         return []
 
 
@@ -206,9 +207,9 @@ async def write_entities_to_neo4j(entities: List[ExtractedEntity]) -> tuple[int,
                             )
                             rels_created += 1
                         except Exception as rel_err:
-                            print(f"[Ingestion] Relation error: {rel_err}")
+                            logger.error(f"Relation error: {rel_err}")
 
-        print(f"[Ingestion] Neo4j: {nodes_created} nodes, {rels_created} relations")
+        logger.info(f"Neo4j: {nodes_created} nodes, {rels_created} relations")
 
     finally:
         await driver.close()
@@ -262,7 +263,7 @@ async def write_document_to_qdrant(
     if points:
         client.upsert(collection_name=settings.qdrant_collection, points=points)
 
-    print(f"[Ingestion] Qdrant: {len(points)} vectors")
+    logger.info(f"Qdrant: {len(points)} vectors")
     return len(points)
 
 
@@ -312,7 +313,7 @@ async def ingest_document(
     errors = []
 
     domain = await detect_domain_from_content(content)
-    print(f"[Ingestion] Detected domain: {domain}")
+    logger.info(f"Detected domain: {domain}")
 
     switch_domain(domain)
 
@@ -332,10 +333,11 @@ async def ingest_document(
             try:
                 nodes_created, rels_created = await write_entities_to_neo4j(entities)
             except Exception as e:
+                logger.error(f"Neo4j write error: {e}")
                 errors.append(f"Neo4j write error: {e}")
     else:
-        print(
-            f"[Ingestion] No schema found for domain {domain}, skipping entity extraction"
+        logger.warning(
+            f"No schema found for domain {domain}, skipping entity extraction"
         )
 
     vectors_created = 0
@@ -344,6 +346,7 @@ async def ingest_document(
             content, filename, domain, doc_type
         )
     except Exception as e:
+        logger.error(f"Qdrant write error: {e}")
         errors.append(f"Qdrant write error: {e}")
 
     return IngestResult(
