@@ -123,7 +123,7 @@ class QdrantClientWrapper:
 
 async def get_embedding(text: str) -> List[float]:
     async with httpx.AsyncClient(timeout=30.0) as client:
-        headers = {"Authorization": f"Bearer {settings.llm_api_key}"}
+        headers = {"Authorization": f"Bearer {settings.embedding_api_key}"}
         
         if settings.token_enabled:
             token = token_manager.get_token()
@@ -131,7 +131,7 @@ async def get_embedding(text: str) -> List[float]:
                 headers["Authorization"] = token
 
         response = await client.post(
-            f"{settings.llm_base_url}/embeddings",
+            f"{settings.embedding_base_url}/embeddings",
             json={"model": settings.embedding_model_name, "input": text},
             headers=headers,
         )

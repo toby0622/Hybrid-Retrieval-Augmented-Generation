@@ -8,6 +8,9 @@ class Settings(BaseSettings):
     llm_base_url: str = ""
     llm_api_key: str = ""
     llm_model_name: str = ""
+    
+    embedding_base_url: str = ""
+    embedding_api_key: str = ""
     embedding_model_name: str = ""
 
     token_url: Optional[str] = None
