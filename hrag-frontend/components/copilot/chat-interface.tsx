@@ -14,7 +14,7 @@ const INITIAL_MESSAGES: Message[] = [
     id: 1,
     role: 'system',
     content: 'DevOps Copilot Online. Connecting to backend services...',
-    timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    timestamp: ''
   }
 ];
 
