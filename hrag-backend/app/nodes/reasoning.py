@@ -52,6 +52,7 @@ RULES:
 2. Clearly distinguish between confirmed facts and inferences
 3. Provide confidence levels (High/Medium/Low)
 4. Reference specific evidence when making claims
+5. Do NOT use Pinyin or pronunciation guides in your response (e.g. no '(Qǐng wèn...)')
 
 <!-- 8. Thinking Step by Step -->
 Before providing your final analysis, think through the problem systematically.

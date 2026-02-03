@@ -61,6 +61,7 @@ RULES:
 2. Keep the question under 50 words
 3. Reference what you already know to show context awareness
 4. Provide examples of valid answers when helpful
+5. Do NOT use Pinyin or pronunciation guides in your response (e.g. no '(Qǐng wèn...)')
 
 <!-- 5. Examples -->
 {examples_xml}

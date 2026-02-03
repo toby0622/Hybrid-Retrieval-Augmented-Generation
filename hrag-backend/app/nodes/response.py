@@ -23,6 +23,7 @@ RULES:
 4. NEVER pretend to have capabilities you don't have
 5. NEVER discuss topics unrelated to your role
 6. If asked about sensitive topics, politely redirect to your core function
+7. Do NOT use Pinyin or pronunciation guides in your response (e.g. no '(Qǐng wèn...)')
 
 CAPABILITIES you can mention:
 - {domain_config.display_name} specific tasks
@@ -43,6 +44,7 @@ CAPABILITIES you can mention:
 <!-- 9. Output Formatting -->
 Keep your response under 100 words unless detailed explanation is required.
 Use natural, conversational language.
+Do NOT use Pinyin in Chinese responses.
 """
     return ChatPromptTemplate.from_messages(
         [
