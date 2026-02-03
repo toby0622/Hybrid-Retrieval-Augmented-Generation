@@ -205,9 +205,6 @@ async def health_check():
         from app.services.auth import token_manager
 
         headers = {}
-        if settings.llm_api_key:
-             headers["Authorization"] = f"Bearer {settings.llm_api_key}"
-
         if settings.token_enabled:
             loop = asyncio.get_running_loop()
             token = await loop.run_in_executor(None, token_manager.get_token)
