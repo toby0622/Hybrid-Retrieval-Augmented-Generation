@@ -77,8 +77,17 @@ async def chat_response_node(state: GraphState) -> GraphState:
 
 async def clarification_response_node(state: GraphState) -> GraphState:
     clarification = state.get("clarification_question", "")
+    
+    # Get or preserve original query
+    original_query = state.get("original_query") or state.get("query", "")
 
-    return {**state, "response": clarification}
+    return {
+        **state,
+        "response": clarification,
+        # Mark that we're waiting for a clarification response
+        "awaiting_clarification": True,
+        "original_query": original_query,
+    }
 
 
 async def diagnostic_response_node(state: GraphState) -> GraphState:

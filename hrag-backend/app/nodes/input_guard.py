@@ -178,11 +178,14 @@ def _get_slot_extraction_prompt(domain_config) -> ChatPromptTemplate:
 
     slots_xml += "</slot_schema>"
 
+    # Build schema display - need quadruple braces to escape through f-string AND LangChain
+    # f-string: {{{{ -> {{ after first interpolation
+    # LangChain: {{ -> { after second interpolation
     schema_fields = [
         f'"{s}": "string|null"'
         for s in domain_config.slots.required + domain_config.slots.optional
     ]
-    schema_str = "{{" + ", ".join(schema_fields) + "}}"
+    schema_str = "{{{{" + ", ".join(schema_fields) + "}}}}"
 
     system_prompt = f"""<!-- 1. Task Context -->
 You are SlotExtractor. Your responsibility is to extract structured information from user queries.
@@ -207,11 +210,11 @@ STRICT RULES:
 <examples>
   <example>
     <input>Auth-Service is failing with timeout errors</input>
-    <output>{{"service_name": "Auth-Service", "error_type": "timeout errors", "timeframe": null}}</output>
+    <output>{{{{"service_name": "Auth-Service", "error_type": "timeout errors", "timeframe": null}}}}</output>
   </example>
   <example>
     <input>Database connection issues in the last 2 hours</input>
-    <output>{{"service_name": null, "error_type": "connection issues", "timeframe": "last 2 hours"}}</output>
+    <output>{{{{"service_name": null, "error_type": "connection issues", "timeframe": "last 2 hours"}}}}</output>
   </example>
 </examples>
 
@@ -230,7 +233,106 @@ Schema: {schema_str}"""
 
 async def input_guard_node(state: GraphState) -> GraphState:
     query = state.get("query", "")
+    
+    # Check if this is a clarification response
+    clarification_response = state.get("clarification_response")
+    if clarification_response:
+        # This is a response to a clarification question
+        # Preserve existing domain, intent, and slots - just extract new slot info
+        current_domain = get_active_domain()
+        
+        print(f"[InputGuard] Processing clarification response: {clarification_response}")
+        
+        if current_domain and state.get("slots"):
+            # Extract additional slot values from the clarification response
+            llm = get_llm()
+            extraction_prompt = _get_slot_extraction_prompt(current_domain)
+            extraction_chain = extraction_prompt | llm
+            
+            existing_slots = state.get("slots")
+            if isinstance(existing_slots, SlotInfo):
+                existing_slots = existing_slots.to_dynamic()
+            
+            # Combine original query + clarification response for better extraction
+            # Also include the previous clarification question for context
+            original_query = state.get("original_query", "")
+            prev_clarification = state.get("clarification_question", "")
+            
+            # Create enriched context for slot extraction
+            enriched_query = f"""Original query: {original_query}
+System asked: {prev_clarification}
+User answered: {clarification_response}"""
+            
+            print(f"[InputGuard] Enriched context for extraction: {enriched_query}")
+            
+            try:
+                result = await extraction_chain.ainvoke({"query": enriched_query})
+                content = result.content.strip()
+                
+                # Normalize smart quotes to standard quotes
+                content = content.replace("“", '"').replace("”", '"')
+                
+                print(f"[InputGuard] Raw extraction result: {repr(content)}")
+                
+                # Handle the case where LLM response doesn't start with {
+                # (because we prefill with { in the AI message)
+                if not content.startswith("{"):
+                    content = "{" + content
+                
+                # Handle markdown code blocks
+                if "```" in content:
+                    parts = content.split("```")
+                    for part in parts:
+                        if part.strip().startswith("json"):
+                            content = part.strip()[4:].strip()
+                            break
+                        elif part.strip().startswith("{"):
+                            content = part.strip()
+                            break
+                
+                # Ensure proper JSON structure
+                # Sometimes LLM outputs without closing brace
+                brace_count = content.count("{") - content.count("}")
+                if brace_count > 0:
+                    content = content + "}" * brace_count
+                
+                print(f"[InputGuard] Cleaned JSON: {content}")
+                
+                slot_data = json.loads(content)
+                
+                # Merge new slot values into existing slots
+                for key, value in slot_data.items():
+                    if value is not None:
+                        existing_slots.set_slot(key, value)
+                        print(f"[InputGuard] Set slot {key} = {value}")
+                
+            except json.JSONDecodeError as e:
+                print(f"[InputGuard] JSON parse error: {e}")
+                # Fallback: try to extract key-value pairs with regex
+                import re
+                pattern = r'"(\w+)":\s*"([^"]+)"'
+                matches = re.findall(pattern, content)
+                for key, value in matches:
+                    if value and value.lower() != "null":
+                        existing_slots.set_slot(key, value)
+                        print(f"[InputGuard] Fallback set slot {key} = {value}")
+            except Exception as e:
+                print(f"[InputGuard] Clarification slot extraction error: {e}")
+            
+            print(f"[InputGuard] Final slots: {existing_slots.get_filled_slots()}")
+            
+            return {
+                **state,
+                "slots": existing_slots,
+                # Keep existing domain and intent
+                "domain": state.get("domain"),
+                "intent": state.get("intent"),
+                "clarification_count": state.get("clarification_count", 0),
+                # Clear the clarification_response after processing
+                "clarification_response": None,
+            }
 
+    # Normal flow - process as fresh query
     detected_domain = await _detect_domain_async(query)
     if detected_domain:
         switch_domain(detected_domain)

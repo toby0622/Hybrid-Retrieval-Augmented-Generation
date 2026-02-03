@@ -126,6 +126,11 @@ class GraphState(TypedDict, total=False):
     slots: Union[SlotInfo, DynamicSlotInfo]
     clarification_question: Optional[str]
     clarification_count: int
+    
+    # Clarification flow state management
+    awaiting_clarification: bool  # True when waiting for user clarification response
+    original_query: Optional[str]  # Preserves original query during clarification flow
+    clarification_response: Optional[str]  # The user's response to a clarification question
 
     graph_results: List[RetrievalResult]
     vector_results: List[RetrievalResult]
