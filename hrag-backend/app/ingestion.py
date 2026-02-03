@@ -6,7 +6,7 @@ import httpx
 from app.domain_config import DomainRegistry
 from app.domain_init import (get_active_domain, list_available_domains,
                              switch_domain)
-from app.llm_factory import get_llm
+from app.llm_factory import get_embedding, get_llm
 from app.schema_registry import SchemaRegistry
 from app.services.auth import token_manager
 from config import settings
@@ -34,22 +34,7 @@ class IngestResult:
     errors: List[str] = field(default_factory=list)
 
 
-async def get_embedding(text: str) -> List[float]:
-    async with httpx.AsyncClient(timeout=60.0) as client:
-        headers = {"Authorization": f"Bearer {settings.embedding_api_key}"}
-        if settings.token_enabled:
-            token = token_manager.get_token()
-            if token:
-                headers["Authorization"] = token
 
-        response = await client.post(
-            f"{settings.embedding_base_url}/embeddings",
-            json={"model": settings.embedding_model_name, "input": text},
-            headers=headers,
-        )
-        response.raise_for_status()
-        data = response.json()
-        return data["data"][0]["embedding"]
 
 
 def _build_extraction_prompt(schema) -> ChatPromptTemplate:

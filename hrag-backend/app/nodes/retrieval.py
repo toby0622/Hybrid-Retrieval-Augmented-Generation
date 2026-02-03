@@ -3,7 +3,7 @@ from typing import Any, List, Optional
 
 import httpx
 from app.domain_init import get_active_domain
-from app.llm_factory import get_llm
+from app.llm_factory import get_embedding, get_llm
 from app.schema_registry import SchemaRegistry
 from app.services.auth import token_manager
 from app.state import DynamicSlotInfo, GraphState, RetrievalResult, SlotInfo
@@ -121,23 +121,7 @@ class QdrantClientWrapper:
         return cls._client
 
 
-async def get_embedding(text: str) -> List[float]:
-    async with httpx.AsyncClient(timeout=30.0) as client:
-        headers = {"Authorization": f"Bearer {settings.embedding_api_key}"}
-        
-        if settings.token_enabled:
-            token = token_manager.get_token()
-            if token:
-                headers["Authorization"] = token
 
-        response = await client.post(
-            f"{settings.embedding_base_url}/embeddings",
-            json={"model": settings.embedding_model_name, "input": text},
-            headers=headers,
-        )
-        response.raise_for_status()
-        data = response.json()
-        return data["data"][0]["embedding"]
 
 
 async def graph_search_node(state: GraphState) -> GraphState:

@@ -6,6 +6,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 import httpx
+from app.llm_factory import get_embedding
 from config import settings
 from qdrant_client import QdrantClient
 from qdrant_client.models import Distance, PointStruct, VectorParams
@@ -594,16 +595,7 @@ INCIDENT_LOGS = [
 ]
 
 
-async def get_embedding(text: str) -> list[float]:
-    async with httpx.AsyncClient(timeout=60.0) as client:
-        response = await client.post(
-            f"{settings.llm_base_url}/embeddings",
-            json={"model": settings.embedding_model_name, "input": text},
-            headers={"Authorization": f"Bearer {settings.llm_api_key}"},
-        )
-        response.raise_for_status()
-        data = response.json()
-        return data["data"][0]["embedding"]
+
 
 
 async def clear_collection(client: QdrantClient):

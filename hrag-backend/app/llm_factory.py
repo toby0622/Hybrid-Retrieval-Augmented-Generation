@@ -1,3 +1,6 @@
+from typing import List
+
+import httpx
 from langchain_openai import ChatOpenAI
 from config import settings
 from app.services.auth import token_manager
@@ -10,7 +13,6 @@ def get_llm():
     default_headers = {"Content-Type": "application/json"}
     
     if settings.token_enabled:
-        # This might block if token/exchange is needed
         token = token_manager.get_token()
         if token:
             default_headers["Authorization"] = token
@@ -21,4 +23,23 @@ def get_llm():
         model=settings.llm_model_name,
         temperature=0.7,
         default_headers=default_headers
+
     )
+
+
+async def get_embedding(text: str) -> List[float]:
+    async with httpx.AsyncClient(timeout=60.0) as client:
+        headers = {"Authorization": f"Bearer {settings.embedding_api_key}"}
+        if settings.token_enabled:
+            token = token_manager.get_token()
+            if token:
+                headers["Authorization"] = token
+
+        response = await client.post(
+            f"{settings.embedding_base_url}/embeddings",
+            json={"model": settings.embedding_model_name, "input": text},
+            headers=headers,
+        )
+        response.raise_for_status()
+        data = response.json()
+        return data["data"][0]["embedding"]
