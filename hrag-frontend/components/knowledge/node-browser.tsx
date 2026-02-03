@@ -113,7 +113,7 @@ export function NodeBrowser({ isOpen, onClose, addToast }: NodeBrowserProps) {
                     
                     <button
                       onClick={() => handleEdit(node)}
-                      className="p-2 bg-slate-800 hover:bg-blue-600 hover:text-white rounded-lg text-slate-400 transition-colors opacity-0 group-hover:opacity-100"
+                      className="p-2 bg-slate-800 hover:bg-blue-600 hover:text-white rounded-lg text-slate-400 transition-colors"
                       title="Edit Node"
                     >
                       <Edit2 className="w-4 h-4" />

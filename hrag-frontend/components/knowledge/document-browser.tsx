@@ -107,7 +107,7 @@ export function DocumentBrowser({ isOpen, onClose, addToast }: DocumentBrowserPr
                     
                     <button
                       onClick={() => handleEdit(doc)}
-                      className="p-2 bg-slate-800 hover:bg-blue-600 hover:text-white rounded-lg text-slate-400 transition-colors opacity-0 group-hover:opacity-100"
+                      className="p-2 bg-slate-800 hover:bg-blue-600 hover:text-white rounded-lg text-slate-400 transition-colors"
                       title="Edit Content"
                     >
                       <Edit2 className="w-4 h-4" />
