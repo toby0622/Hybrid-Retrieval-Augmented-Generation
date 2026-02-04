@@ -3,7 +3,7 @@ from typing import Optional
 
 from app.domain_config import DomainConfig, DomainRegistry
 from app.schema_registry import Schema, SchemaRegistry
-from config import settings
+from app.core.config import settings
 
 
 def initialize_domain_system(

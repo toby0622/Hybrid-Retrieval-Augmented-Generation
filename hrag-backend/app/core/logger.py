@@ -1,6 +1,6 @@
 import logging
 import sys
-from config import settings
+from app.core.config import settings
 
 def setup_logger(name: str = "hrag_backend"):
     logger = logging.getLogger(name)

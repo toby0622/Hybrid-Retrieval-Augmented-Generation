@@ -2,7 +2,7 @@ from typing import List
 
 import httpx
 from langchain_openai import ChatOpenAI
-from config import settings
+from app.core.config import settings
 from app.services.auth import token_manager
 
 def get_llm():

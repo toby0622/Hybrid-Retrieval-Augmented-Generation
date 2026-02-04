@@ -1,6 +1,6 @@
 from datetime import datetime, timezone, timedelta
 import httpx
-from config import settings
+from app.core.config import settings
 
 class TokenManager:
     _instance = None

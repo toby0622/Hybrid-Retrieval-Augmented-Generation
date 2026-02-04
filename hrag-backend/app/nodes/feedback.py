@@ -2,7 +2,7 @@ from typing import Any, Dict, List
 
 from app.llm_factory import get_llm
 from app.state import GraphState, SlotInfo
-from config import settings
+from app.core.config import settings
 from langchain_core.prompts import ChatPromptTemplate
 
 
@@ -104,7 +104,7 @@ async def feedback_node(state: GraphState) -> GraphState:
 
 
 async def _generate_case_study(state: GraphState) -> GraphState:
-    from app.ingestion import ingest_document
+    from app.services.ingestion import ingest_document
 
     slots = state.get("slots", SlotInfo())
     diagnostic = state.get("diagnostic")

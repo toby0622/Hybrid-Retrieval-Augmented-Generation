@@ -7,10 +7,10 @@ and adds the results to the graph state for use in reasoning.
 
 from typing import List
 
-from app.mcp_client import MCPDatabaseClient, MCPTools
+from app.services.mcp import MCPDatabaseClient, MCPTools
 from app.nodes.retrieval import _make_serializable
 from app.state import DynamicSlotInfo, GraphState, RetrievalResult, SlotInfo
-from config import settings
+from app.core.config import settings
 
 
 async def mcp_tool_node(state: GraphState) -> GraphState:

@@ -7,7 +7,7 @@ from app.llm_factory import get_embedding, get_llm
 from app.schema_registry import SchemaRegistry
 from app.services.auth import token_manager
 from app.state import DynamicSlotInfo, GraphState, RetrievalResult, SlotInfo
-from config import settings
+from app.core.config import settings
 from langchain_core.prompts import ChatPromptTemplate
 from neo4j import AsyncGraphDatabase
 from qdrant_client import QdrantClient

@@ -5,7 +5,7 @@ from app.domain_init import get_active_domain
 from app.llm_factory import get_llm
 from app.state import (DiagnosticResponse, DiagnosticStep, DynamicSlotInfo,
                        GraphState, RetrievalResult, SlotInfo)
-from config import settings
+from app.core.config import settings
 from langchain_core.prompts import ChatPromptTemplate
 
 
