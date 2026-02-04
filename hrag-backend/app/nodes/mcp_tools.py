@@ -1,9 +1,3 @@
-"""
-MCP Tool Node for LangGraph Workflow.
-
-This node executes MCP database queries based on extracted slots
-and adds the results to the graph state for use in reasoning.
-"""
 
 from typing import List
 
@@ -14,18 +8,6 @@ from app.core.config import settings
 
 
 async def mcp_tool_node(state: GraphState) -> GraphState:
-    """
-    Execute MCP tools to fetch real-time data.
-    
-    This node is called after hybrid retrieval to supplement
-    graph and vector search results with live database data.
-    
-    Args:
-        state: Current graph state
-        
-    Returns:
-        Updated state with mcp_results
-    """
     if not settings.mcp_enabled:
         return {**state, "mcp_results": []}
     

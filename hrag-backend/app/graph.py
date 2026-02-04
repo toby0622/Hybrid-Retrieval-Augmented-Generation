@@ -87,7 +87,6 @@ async def run_query(
 ) -> GraphState:
     config = {"configurable": {"thread_id": thread_id}}
 
-    # Try to get existing state from MemorySaver
     existing_state = None
     try:
         state_snapshot = graph.get_state(config)
@@ -96,30 +95,24 @@ async def run_query(
     except Exception:
         pass
 
-    # Check if we're in a clarification flow (awaiting user response)
     is_clarification_response = (
         existing_state 
         and existing_state.get("awaiting_clarification", False)
     )
 
     if is_clarification_response:
-        # This is a clarification response - merge with existing state
         initial_state: GraphState = {
             "query": query,
             "messages": existing_state.get("messages", []),
-            # Preserve context from previous state
             "domain": existing_state.get("domain"),
             "intent": existing_state.get("intent"),
             "slots": existing_state.get("slots"),
             "original_query": existing_state.get("original_query"),
             "clarification_count": existing_state.get("clarification_count", 0),
-            # Mark that we're processing a clarification response
             "awaiting_clarification": False,
-            # Pass the clarification response for slot merging
             "clarification_response": query,
         }
     else:
-        # Fresh query - create new state
         initial_state: GraphState = {
             "query": query,
             "messages": [],

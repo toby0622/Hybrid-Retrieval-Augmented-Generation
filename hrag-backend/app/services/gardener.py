@@ -1,8 +1,6 @@
 from typing import Dict
 from app.schemas.common import EntityConflict
 
-# In-memory storage for gardener tasks
-# In production, this should be Redis or a database
 gardener_tasks: Dict[str, EntityConflict] = {}
 
 def get_all_tasks():

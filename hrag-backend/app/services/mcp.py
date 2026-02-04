@@ -1,9 +1,3 @@
-"""
-MCP Database Client for Real-Time Data Queries.
-
-This module provides an MCP-style database client that exposes PostgreSQL
-operations as tools for the HRAG system to query real-time data.
-"""
 
 from typing import Any, Dict, List, Optional
 
@@ -13,18 +7,11 @@ from app.core.config import settings
 
 
 class MCPDatabaseClient:
-    """
-    MCP client for PostgreSQL database operations.
-    
-    Exposes database queries as tools that can be invoked during
-    the hybrid retrieval phase to fetch real-time data.
-    """
     
     _pool: Optional[asyncpg.Pool] = None
     
     @classmethod
     async def get_pool(cls) -> Optional[asyncpg.Pool]:
-        """Get or create the connection pool."""
         if cls._pool is None:
             try:
                 cls._pool = await asyncpg.create_pool(
@@ -43,14 +30,12 @@ class MCPDatabaseClient:
     
     @classmethod
     async def close(cls) -> None:
-        """Close the connection pool."""
         if cls._pool:
             await cls._pool.close()
             cls._pool = None
     
     @classmethod
     async def is_available(cls) -> bool:
-        """Check if MCP database is available."""
         if not settings.mcp_enabled:
             return False
         pool = await cls.get_pool()
@@ -62,16 +47,6 @@ class MCPDatabaseClient:
         query: str, 
         params: Optional[tuple] = None
     ) -> List[Dict[str, Any]]:
-        """
-        Execute a raw SQL query and return results as list of dicts.
-        
-        Args:
-            query: SQL query string with $1, $2, etc. placeholders
-            params: Query parameters tuple
-            
-        Returns:
-            List of dictionaries representing rows
-        """
         pool = await cls.get_pool()
         if not pool:
             return []
@@ -89,28 +64,12 @@ class MCPDatabaseClient:
 
 
 class MCPTools:
-    """
-    Collection of MCP tools for real-time data retrieval.
-    
-    Each method represents a tool that can be invoked based on
-    the extracted slots from the user query.
-    """
     
     @staticmethod
     async def query_service_metrics(
         service_name: str,
         limit: int = 10
     ) -> tuple[List[Dict[str, Any]], str]:
-        """
-        Query recent metrics for a specific service.
-        
-        Args:
-            service_name: Name of the service to query
-            limit: Maximum number of records to return
-            
-        Returns:
-            Tuple of (List of metric records, SQL query string)
-        """
         query = """
             SELECT 
                 service_name,
@@ -134,17 +93,6 @@ class MCPTools:
         log_level: Optional[str] = None,
         limit: int = 10
     ) -> tuple[List[Dict[str, Any]], str]:
-        """
-        Query recent log entries.
-        
-        Args:
-            service_name: Filter by service name (optional)
-            log_level: Filter by log level (optional)
-            limit: Maximum number of records to return
-            
-        Returns:
-            Tuple of (List of log records, SQL query string)
-        """
         conditions = []
         params = []
         param_idx = 1
@@ -180,15 +128,6 @@ class MCPTools:
     async def get_service_health(
         service_name: str
     ) -> tuple[List[Dict[str, Any]], str]:
-        """
-        Get current health status for a service.
-        
-        Args:
-            service_name: Name of the service
-            
-        Returns:
-            Tuple of (Health status records, SQL query string)
-        """
         query = """
             SELECT 
                 service_name,
@@ -211,20 +150,6 @@ class MCPTools:
         filters: Optional[Dict[str, Any]] = None,
         limit: int = 20
     ) -> tuple[List[Dict[str, Any]], str]:
-        """
-        Generic tool to query any real-time data table.
-        
-        This is a flexible tool for querying custom tables
-        that may be added in the future.
-        
-        Args:
-            table_name: Name of the table to query
-            filters: Dictionary of column=value filters
-            limit: Maximum number of records
-            
-        Returns:
-            Tuple of (Query results, SQL query string)
-        """
         allowed_tables = [
             "service_metrics",
             "service_logs", 

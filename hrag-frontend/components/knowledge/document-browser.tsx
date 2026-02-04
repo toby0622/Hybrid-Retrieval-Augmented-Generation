@@ -51,7 +51,7 @@ export function DocumentBrowser({ isOpen, onClose, addToast }: DocumentBrowserPr
     setSelectedDoc(null);
     if (wasUpdated) {
     if (wasUpdated) {
-      loadDocuments(undefined, searchQuery); // Reload to see changes
+      loadDocuments(undefined, searchQuery);
     }
     }
   };
@@ -134,7 +134,6 @@ export function DocumentBrowser({ isOpen, onClose, addToast }: DocumentBrowserPr
           
           <div className="p-4 border-t border-slate-800 bg-slate-900/50 rounded-b-xl flex justify-between items-center text-xs text-slate-500">
             <div>Showing {documents.length} items</div>
-            {/* Pagination controls could go here if API supported standardized pagination response */}
           </div>
         </div>
       )}

@@ -93,7 +93,6 @@ async def ingest_document_endpoint(
     doc_type: str = "document",
 ):
     try:
-        # Import moved service
         from app.services.ingestion import ingest_document
 
         content = await file.read()
@@ -159,7 +158,6 @@ async def list_documents(limit: int = 50, offset: Optional[str] = None, search: 
 
         client = QdrantClient(host=settings.qdrant_host, port=settings.qdrant_port)
         
-        # Use scroll API to list points
         scroll_filter = None
         
         if search:

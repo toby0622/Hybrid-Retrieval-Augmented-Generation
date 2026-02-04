@@ -92,8 +92,6 @@ async def feedback_node(state: GraphState) -> GraphState:
     feedback = state.get("feedback")
 
     if feedback == "resolved":
-        # Keep old behavior for now, or unified?
-        # Let's unify it: 'resolved' also generates case study if not already done.
         return await _generate_case_study(state)
     elif feedback == "generate_case_study":
         return await _generate_case_study(state)
@@ -135,7 +133,6 @@ async def _generate_case_study(state: GraphState) -> GraphState:
         )
         case_study_content = result.content
         
-        # Ingest the generated case study
         ingest_result = await ingest_document(
             content=case_study_content,
             filename=f"CaseStudy_{slots.service_name}_{slots.error_type}.md",

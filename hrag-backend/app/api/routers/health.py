@@ -46,7 +46,6 @@ async def health_check():
             logger.error(f"Qdrant health check failed: {e}")
             return f"error: {str(e)[:50]}"
 
-    # Execute checks
     neo4j_status = await check_service(check_neo4j_sync)
     qdrant_status = await check_service(check_qdrant_sync)
 
@@ -62,7 +61,6 @@ async def health_check():
 
 @router.get("/stats")
 async def get_stats():
-    # Avoid circular imports if main imports this
     from app.services.gardener import gardener_tasks
     
     indexed_documents = 0

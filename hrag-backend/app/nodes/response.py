@@ -80,13 +80,11 @@ async def chat_response_node(state: GraphState) -> GraphState:
 async def clarification_response_node(state: GraphState) -> GraphState:
     clarification = state.get("clarification_question", "")
     
-    # Get or preserve original query
     original_query = state.get("original_query") or state.get("query", "")
 
     return {
         **state,
         "response": clarification,
-        # Mark that we're waiting for a clarification response
         "awaiting_clarification": True,
         "original_query": original_query,
     }
@@ -126,7 +124,6 @@ async def end_conversation_node(state: GraphState) -> GraphState:
     goodbye_msg = f"Thank you for using {name}. The conversation has ended. Feel free to start a new conversation anytime!"
 
     if state.get("case_study_generated"):
-        # Append goodbye to existing response (which contains the case study)
         current_response = state.get("response", "")
         return {
             **state,

@@ -37,7 +37,6 @@ export function DynamicReasoning({ steps, isStreaming = false }: DynamicReasonin
         {displayedSteps.map((step) => {
           const isActive = step.status === 'active';
           const isCompleted = step.status === 'completed';
-          // If neither active nor completed, it's pending (or unknown)
           const isPending = !isActive && !isCompleted;
           
           return (

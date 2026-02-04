@@ -5,7 +5,6 @@ from app.core.config import settings
 def setup_logger(name: str = "hrag_backend"):
     logger = logging.getLogger(name)
     
-    # If logger already has handlers, assume it's set up
     if logger.handlers:
         return logger
         

@@ -33,7 +33,6 @@ class Settings(BaseSettings):
     active_domain: Optional[str] = None
 
 
-    # MCP Database Configuration (PostgreSQL)
     mcp_db_host: str = ""
     mcp_db_port: int = 5432
     mcp_db_name: str = ""

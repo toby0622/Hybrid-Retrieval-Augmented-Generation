@@ -50,7 +50,7 @@ export function NodeBrowser({ isOpen, onClose, addToast }: NodeBrowserProps) {
   const handleEditorClose = (wasUpdated: boolean) => {
     setSelectedNode(null);
     if (wasUpdated) {
-      loadNodes(true, searchQuery); // Reload to see changes
+      loadNodes(true, searchQuery);
     }
   };
 
@@ -136,7 +136,6 @@ export function NodeBrowser({ isOpen, onClose, addToast }: NodeBrowserProps) {
                 </Card>
               ))
             )}
-             {/* Simple Load More Trigger if needed, or infinite scroll. For now using initial load of 50. */}
           </div>
           
           <div className="p-4 border-t border-slate-800 bg-slate-900/50 rounded-b-xl flex justify-between items-center text-xs text-slate-500">

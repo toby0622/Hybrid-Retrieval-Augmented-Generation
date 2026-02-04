@@ -156,7 +156,7 @@ async def extract_entities_with_schema(content: str, schema) -> List[ExtractedEn
         return entities
 
     except Exception as e:
-        logger.error(f"Extraction error: {e}")
+        logger.error(f"Extraction error for {schema.display_name}: {e}")
         return []
 
 
@@ -209,8 +209,10 @@ async def write_entities_to_neo4j(entities: List[ExtractedEntity]) -> tuple[int,
                         except Exception as rel_err:
                             logger.error(f"Relation error: {rel_err}")
 
-        logger.info(f"Neo4j: {nodes_created} nodes, {rels_created} relations")
 
+    except Exception as e:
+        logger.error(f"Neo4j write error: {e}")
+        raise e
     finally:
         await driver.close()
 

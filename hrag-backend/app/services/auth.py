@@ -15,11 +15,6 @@ class TokenManager:
         return cls._instance
 
     def get_token(self, token_type: str = "llm") -> str | None:
-        """
-        Returns the current valid token (J2 Token) for the specified type.
-        token_type: "llm" or "embedding"
-        If the token is missing or expired, it initiates a token exchange.
-        """
         if not settings.token_enabled:
             return None
 
@@ -35,14 +30,10 @@ class TokenManager:
         if not token or not expires_at:
             return False
         
-        # Check against current UTC time with a safety buffer (e.g., 60 seconds)
         now = datetime.now(timezone.utc)
         return now < (expires_at - timedelta(seconds=60))
 
     def _exchange_token(self, token_type: str) -> str:
-        """
-        Exchanges J1 Token for J2 Token for the specified type.
-        """
         if not settings.token_url:
              raise ValueError("TOKEN_URL must be set when TOKEN_ENABLED is True")
 
@@ -69,7 +60,6 @@ class TokenManager:
                 expires_at_str = data.get("expiresAt")
                 
                 if expires_at_str:
-                    # Handle typical ISO formats. 
                     if expires_at_str.endswith('Z'):
                         expires_at_str = expires_at_str[:-1] + '+00:00'
                     self._expires_at[token_type] = datetime.fromisoformat(expires_at_str)
@@ -79,8 +69,6 @@ class TokenManager:
                 return self._tokens[token_type]
                 
         except Exception as e:
-            # Log error or re-raise
-            # In a real app we might want logging.
             print(f"[TokenManager] Exchange failed for {token_type}: {e}")
             raise e
 

@@ -218,18 +218,18 @@ def get_schema_for_llm_prompt() -> str:
 
     lines.append("## Example Cypher Queries\n")
     lines.append("```cypher")
-    lines.append("-- Find service and its dependencies")
+    lines.append("")
     lines.append(
         "MATCH (s:Service {name: 'auth-service'})-[:DEPENDS_ON]->(dep:Service)"
     )
     lines.append("RETURN s.name, collect(dep.name) as dependencies")
     lines.append("")
-    lines.append("-- Find incidents affecting a service")
+    lines.append("")
     lines.append("MATCH (inc:Incident)-[:AFFECTS]->(s:Service)")
     lines.append("WHERE toLower(s.name) CONTAINS toLower('payment')")
     lines.append("RETURN inc.title, inc.severity, s.name")
     lines.append("")
-    lines.append("-- Find error logs for a service")
+    lines.append("")
     lines.append("MATCH (log:Log)-[:GENERATED_BY]->(s:Service)")
     lines.append("WHERE log.level = 'ERROR' AND s.name = 'auth-service'")
     lines.append("RETURN log.message, log.timestamp")

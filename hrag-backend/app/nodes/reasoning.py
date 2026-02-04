@@ -188,7 +188,6 @@ def _parse_diagnostic_response(
     mcp_results = mcp_results or []
 
     if graph_results:
-        # Use the Cypher query from the first result's metadata if available
         first_result = graph_results[0]
         cypher_query = first_result.get("metadata", {}).get("cypher_query", "Query info not available")
         
@@ -256,17 +255,13 @@ def _parse_diagnostic_response(
         )
 
     if mcp_results:
-        # Use the SQL query from the first result's metadata if available
         first_result = mcp_results[0]
         sql_query = first_result.get("metadata", {}).get("sql_query", "SQL info not available")
         
-        # Prepare data for table view (list of dicts)
         table_data = []
         for r in mcp_results:
-            # Prefer using the raw_data which is the original dictionary
             if r.get("raw_data"):
                 data = r.get("raw_data").copy()
-                # Remove large fields or internal metadata if necessary, but key 'sql_query' isn't in raw_data usually
                 if "sql_query" in data:
                     del data["sql_query"]
                 table_data.append(data)

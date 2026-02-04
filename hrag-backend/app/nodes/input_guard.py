@@ -234,17 +234,13 @@ Schema: {schema_str}"""
 async def input_guard_node(state: GraphState) -> GraphState:
     query = state.get("query", "")
     
-    # Check if this is a clarification response
     clarification_response = state.get("clarification_response")
     if clarification_response:
-        # This is a response to a clarification question
-        # Preserve existing domain, intent, and slots - just extract new slot info
         current_domain = get_active_domain()
         
         print(f"[InputGuard] Processing clarification response: {clarification_response}")
         
         if current_domain and state.get("slots"):
-            # Extract additional slot values from the clarification response
             llm = get_llm()
             extraction_prompt = _get_slot_extraction_prompt(current_domain)
             extraction_chain = extraction_prompt | llm
@@ -253,12 +249,9 @@ async def input_guard_node(state: GraphState) -> GraphState:
             if isinstance(existing_slots, SlotInfo):
                 existing_slots = existing_slots.to_dynamic()
             
-            # Combine original query + clarification response for better extraction
-            # Also include the previous clarification question for context
             original_query = state.get("original_query", "")
             prev_clarification = state.get("clarification_question", "")
             
-            # Create enriched context for slot extraction
             enriched_query = f"""Original query: {original_query}
 System asked: {prev_clarification}
 User answered: {clarification_response}"""
@@ -274,12 +267,9 @@ User answered: {clarification_response}"""
                 
                 print(f"[InputGuard] Raw extraction result: {repr(content)}")
                 
-                # Handle the case where LLM response doesn't start with {
-                # (because we prefill with { in the AI message)
                 if not content.startswith("{"):
                     content = "{" + content
                 
-                # Handle markdown code blocks
                 if "```" in content:
                     parts = content.split("```")
                     for part in parts:
@@ -290,8 +280,6 @@ User answered: {clarification_response}"""
                             content = part.strip()
                             break
                 
-                # Ensure proper JSON structure
-                # Sometimes LLM outputs without closing brace
                 brace_count = content.count("{") - content.count("}")
                 if brace_count > 0:
                     content = content + "}" * brace_count
@@ -300,7 +288,6 @@ User answered: {clarification_response}"""
                 
                 slot_data = json.loads(content)
                 
-                # Merge new slot values into existing slots
                 for key, value in slot_data.items():
                     if value is not None:
                         existing_slots.set_slot(key, value)
@@ -308,7 +295,6 @@ User answered: {clarification_response}"""
                 
             except json.JSONDecodeError as e:
                 print(f"[InputGuard] JSON parse error: {e}")
-                # Fallback: try to extract key-value pairs with regex
                 import re
                 pattern = r'"(\w+)":\s*"([^"]+)"'
                 matches = re.findall(pattern, content)
@@ -328,11 +314,9 @@ User answered: {clarification_response}"""
                 "domain": state.get("domain"),
                 "intent": state.get("intent"),
                 "clarification_count": state.get("clarification_count", 0),
-                # Clear the clarification_response after processing
                 "clarification_response": None,
             }
 
-    # Normal flow - process as fresh query
     detected_domain = await _detect_domain_async(query)
     if detected_domain:
         switch_domain(detected_domain)
