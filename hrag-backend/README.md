@@ -1,6 +1,6 @@
 # HRAG Backend
 
-The backend for the Hybrid RAG DevOps Copilot, built with FastAPI, LangGraph, Neo4j, and Qdrant. Now featuring **MCP (Model Context Protocol)** for real-time data and a **Dynamic Schema Registry**.
+The backend for the Hybrid RAG system, built with FastAPI, LangGraph, Neo4j, and Qdrant. Featuring **MCP (Model Context Protocol)** for real-time data and a **Dynamic Schema Registry**.
 
 ## 🛠️ Prerequisites
 
@@ -34,11 +34,11 @@ The backend for the Hybrid RAG DevOps Copilot, built with FastAPI, LangGraph, Ne
 4.  Set up environment variables:
     Create a `.env` file (copy from `.env.example`) and populate it:
     ```env
-    # LLM Configuration (LM Studio local server)
-    LLM_BASE_URL=http://localhost:8192/v1
-    LLM_API_KEY=lm-studio
-    LLM_MODEL_NAME=google/gemma-3-27b
-    EMBEDDING_MODEL_NAME=text-embedding-embeddinggemma-300m
+    # LLM Configuration
+    LLM_BASE_URL=...
+    LLM_API_KEY=...
+    LLM_MODEL_NAME=...
+    EMBEDDING_MODEL_NAME=...
 
     # Neo4j Configuration
     NEO4J_URI=bolt://localhost:7687
@@ -59,24 +59,23 @@ The backend for the Hybrid RAG DevOps Copilot, built with FastAPI, LangGraph, Ne
     MCP_ENABLED=true
     MCP_DB_HOST=localhost
     MCP_DB_PORT=5432
-    MCP_DB_NAME=devops_metrics
+    MCP_DB_NAME=hrag_mcp
     MCP_DB_USER=postgres
     MCP_DB_PASSWORD=password
     ```
 
 ## 🗄️ Database Seeding
 
-Before running the app, seed the databases with the DevOps schema and sample data:
+To seed your database, you should create a domain configuration in `config/domains/` and a corresponding schema in `scripts/`. Use the provided templates as a guide:
+
+- `config/domains/template.yaml.example`
+- `scripts/template_schema.py.example`
+
+After creating your own seeding scripts based on these templates, you can run them:
 
 ```bash
-# Seed Graph Data (Neo4j)
-python scripts/seed_neo4j_devops.py
-
-# Seed Vector Data (Qdrant)
-python scripts/seed_qdrant_devops.py
-
-# Seed MCP Data (PostgreSQL/SQLAlchemy)
-python scripts/seed_mcp_data.py
+# Example seeding command
+python scripts/seed_your_domain.py
 ```
 
 ## 🚀 Running the Server

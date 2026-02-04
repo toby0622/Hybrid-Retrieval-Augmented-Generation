@@ -1,0 +1,160 @@
+# Domain Configuration Template
+# This file serves as a template for creating new domain configurations for the HRAG system.
+# Rename this file to <domain_name>.yaml and place it in the hrag-backend/config/domains/ directory.
+
+# -----------------------------------------------------------------------------
+# 1. Basic Information
+# -----------------------------------------------------------------------------
+name: template_domain             # Unique identifier for the domain (lowercase, no spaces)
+display_name: "Template Domain"   # Human-readable name for UI display
+description: "A template for creating new domains"
+schema: template                  # References the schema name (e.g., template_schema.py)
+response_language: "zh-TW"        # Language for responses (default: zh-TW)
+
+# -----------------------------------------------------------------------------
+# 2. Routing Configuration
+# -----------------------------------------------------------------------------
+# Keywords used to auto-detect this domain from user queries.
+# The system checks if user input contains these keywords to route to this domain.
+routing_keywords:
+  - template
+  - example
+  - 範例
+  - demo
+  - test
+
+# -----------------------------------------------------------------------------
+# 3. Intent Classification
+# -----------------------------------------------------------------------------
+# Define the possible intents for this domain.
+intents:
+  - query       # General informational queries
+  - action      # Requests to perform an action
+  - status      # Requests for status information
+  - chat        # General conversation
+  - end         # End conversation
+
+# Mapping of intents to keywords for heuristic classification (optional but recommended)
+intent_keywords:
+  query:
+    - what
+    - how
+    - 什麼
+    - 如何
+    - info
+  action:
+    - do
+    - run
+    - execute
+    - 執行
+    - start
+  status:
+    - status
+    - health
+    - check
+    - 狀態
+    - 檢查
+
+# -----------------------------------------------------------------------------
+# 4. Slot Filling Configuration
+# -----------------------------------------------------------------------------
+# Define information that needs to be extracted from the user's query.
+slots:
+  # Slots that MUST be filled before proceeding (system will ask follow-up questions)
+  required:
+    - target_object
+  
+  # Slots that are helpful but not mandatory
+  optional:
+    - parameter_a
+    - time_range
+  
+  # Examples to help the LLM understand what to look for
+  examples:
+    target_object:
+      - "server-01"
+      - "user-database"
+      - "payment-module"
+    parameter_a:
+      - "verbose"
+      - "force"
+      - "dry-run"
+
+# -----------------------------------------------------------------------------
+# 5. Prompts Configuration
+# -----------------------------------------------------------------------------
+# Customize the system prompts for different stages of the pipeline.
+
+# Prompt for the Intent Classification Node
+classification_prompt:
+  system_identity: |
+    You are an Intent Classifier for the Template Domain.
+    Your job is to categorize user inputs into the defined intents.
+  capabilities:
+    - Identify user intent based on keywords and context
+    - Distinguish between queries and actions
+
+# Prompt for the Slot Filling / Clarification Node
+clarification_prompt:
+  system_identity: |
+    You are a helpful assistant for the Template Domain.
+    Your goal is to gather necessary information from the user.
+  examples:
+    - known: "User wants to check status"
+      missing: "target_object"
+      question: "Which object's status would you like to check?"
+
+# Prompt for the Reasoning / Analysis Node
+reasoning_prompt:
+  system_identity: |
+    You are an Expert Analyst for the Template Domain.
+    Your job is to analyze data and provide insights.
+  capabilities:
+    - Analyze relationships between objects
+    - Detect anomalies
+    - Suggest next steps
+
+# Prompt for the Final Response Node
+chat_prompt:
+  system_identity: |
+    You are the Template Domain Assistant.
+    You communicate clearly and concisely with the user.
+  capabilities:
+    - Answer questions about the domain
+    - summarized search results
+
+# -----------------------------------------------------------------------------
+# 6. Graph Database Queries (Neo4j)
+# -----------------------------------------------------------------------------
+# Cypher queries used to retrieve context from the knowledge graph.
+# $hint is the search term extracted from the user's query.
+
+graph_queries:
+  # Primary search for entities
+  primary_search: |
+    MATCH (n:Entity)
+    WHERE toLower(n.name) CONTAINS toLower($hint)
+    RETURN n.name as name, n.description as description
+    LIMIT 5
+    
+  # Context search for related information
+  context_search: |
+    MATCH (n:Entity)-[r]->(m:Entity)
+    WHERE toLower(n.name) CONTAINS toLower($hint)
+    RETURN n, r, m
+    LIMIT 10
+
+  # Fallback search if primary fails
+  fallback_search: |
+    MATCH (n:Entity)
+    RETURN n.name
+    LIMIT 5
+
+# -----------------------------------------------------------------------------
+# 7. Vector Search Configuration (Qdrant)
+# -----------------------------------------------------------------------------
+# Fields to use for filtering vector search results.
+vector_filter_fields:
+  - category
+  - status
+  - tag

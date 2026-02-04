@@ -1,0 +1,110 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Domain Configuration",
+  "description": "Configuration schema for HRAG domains",
+  "type": "object",
+  "required": ["name", "display_name"],
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Unique identifier for the domain (lowercase, no spaces)"
+    },
+    "display_name": {
+      "type": "string",
+      "description": "Human-readable name for UI display"
+    },
+    "description": {
+      "type": "string",
+      "description": "Description of the domain's purpose"
+    },
+    "schema": {
+      "type": "string",
+      "description": "Reference to the python schema filename (without _schema.py)"
+    },
+    "response_language": {
+      "type": "string",
+      "default": "zh-TW",
+      "description": "Language for responses"
+    },
+    "routing_keywords": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Keywords used to auto-detect this domain"
+    },
+    "intents": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "default": ["question", "chat", "end"],
+      "description": "List of supported intents"
+    },
+    "intent_keywords": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "description": "Mapping of intents to keywords"
+    },
+    "slots": {
+      "type": "object",
+      "properties": {
+        "required": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "optional": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "examples": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "array",
+            "items": { "type": "string" }
+          }
+        }
+      }
+    },
+    "classification_prompt": { "$ref": "#/definitions/promptConfig" },
+    "clarification_prompt": { "$ref": "#/definitions/promptConfig" },
+    "reasoning_prompt": { "$ref": "#/definitions/promptConfig" },
+    "chat_prompt": { "$ref": "#/definitions/promptConfig" },
+    "graph_queries": {
+      "type": "object",
+      "properties": {
+        "primary_search": { "type": "string" },
+        "context_search": { "type": "string" },
+        "fallback_search": { "type": "string" }
+      }
+    },
+    "vector_filter_fields": {
+      "type": "array",
+      "items": { "type": "string" }
+    }
+  },
+  "definitions": {
+    "promptConfig": {
+      "type": "object",
+      "properties": {
+        "system_identity": { "type": "string" },
+        "capabilities": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "examples": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": { "type": "string" }
+          }
+        }
+      }
+    }
+  }
+}

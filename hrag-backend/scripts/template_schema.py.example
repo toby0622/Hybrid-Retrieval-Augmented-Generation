@@ -1,0 +1,138 @@
+from dataclasses import dataclass, field
+from typing import Dict, List, Optional
+
+# -----------------------------------------------------------------------------
+# Schema Metadata
+# -----------------------------------------------------------------------------
+# Using 'template' as the base name, matching 'schema: template' in the YAML config.
+# If you rename this file to 'shopping_schema.py', the YAML should reference 'shopping'.
+
+SCHEMA_NAME = "Template Domain Schema"
+SCHEMA_DESCRIPTION = (
+    "A template schema defining entities and relationships for a knowledge graph."
+)
+
+# -----------------------------------------------------------------------------
+# Data Structures (Do not modify unless you know what you are doing)
+# -----------------------------------------------------------------------------
+
+@dataclass
+class Entity:
+    name: str
+    description: str
+    properties: Dict[str, str] = field(default_factory=dict)
+    extraction_hints: List[str] = field(default_factory=list)
+
+
+@dataclass
+class Relation:
+    source: str
+    target: str
+    name: str
+    description: str = ""
+    properties: List[str] = field(default_factory=list)
+
+# -----------------------------------------------------------------------------
+# Entity Definitions
+# -----------------------------------------------------------------------------
+# Define the nodes (Objects) in your Knowledge Graph.
+
+ENTITY_SCHEMAS = {
+    "User": Entity(
+        name="User",
+        description="A registered user of the system",
+        properties={
+            "id": "Unique user identifier",
+            "name": "Full name of the user",
+            "email": "Email address",
+            "role": "User role (admin, editor, viewer)",
+        },
+        extraction_hints=[
+            "Look for names or email addresses",
+            "Identify user roles mentioned in the context",
+        ],
+    ),
+    "Product": Entity(
+        name="Product",
+        description="An item available in the system catalog",
+        properties={
+            "sku": "Stock Keeping Unit identifier",
+            "name": "Product name",
+            "category": "Product category",
+            "price": "Price of the product",
+        },
+        extraction_hints=[
+            "Identify product names or codes",
+            "Look for pricing information",
+        ],
+    ),
+    "Order": Entity(
+        name="Order",
+        description="A transaction record",
+        properties={
+            "order_id": "Unique order identifier",
+            "status": "Order status (pending, shipped, delivered)",
+            "date": "Date of the order",
+        },
+        extraction_hints=[
+            "Look for order IDs (e.g., ORD-12345)",
+            "Identify order status keywords",
+        ],
+    ),
+}
+
+# -----------------------------------------------------------------------------
+# Relationship Definitions
+# -----------------------------------------------------------------------------
+# Define the edges (Connections) in your Knowledge Graph.
+
+RELATION_SCHEMAS = [
+    Relation(
+        source="User",
+        target="Order",
+        name="PLACED",
+        description="User placed an order",
+    ),
+    Relation(
+        source="Order",
+        target="Product",
+        name="CONTAINS",
+        description="Order contains a product",
+        properties=["quantity"],
+    ),
+    Relation(
+        source="Product",
+        target="Product",
+        name="RELATED_TO",
+        description="Product is similar or related to another product",
+    ),
+]
+
+# -----------------------------------------------------------------------------
+# LLM Schema Prompt Generator
+# -----------------------------------------------------------------------------
+# This function generates a text representation of the schema for the LLM.
+# You typically don't need to modify this unless you want to change the format.
+
+def get_schema_for_llm_prompt() -> str:
+    lines = []
+    lines.append(f"# Knowledge Graph Schema: {SCHEMA_NAME}\n")
+
+    lines.append("## Node Types (Entities)\n")
+    for entity_name, entity in ENTITY_SCHEMAS.items():
+        lines.append(f"### {entity_name}")
+        lines.append(f"Description: {entity.description}")
+        lines.append("Properties:")
+        for prop, desc in entity.properties.items():
+            lines.append(f"  - {prop}: {desc}")
+        lines.append("")
+
+    lines.append("## Relationship Types\n")
+    for rel in RELATION_SCHEMAS:
+        lines.append(f"### (:{rel.source})-[:{rel.name}]->(:{rel.target})")
+        lines.append(f"Description: {rel.description}")
+        if rel.properties:
+            lines.append(f"Properties: {', '.join(rel.properties)}")
+        lines.append("")
+
+    return "\n".join(lines)

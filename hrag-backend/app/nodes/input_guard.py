@@ -51,12 +51,12 @@ RULES:
 <!-- 5. Examples -->
 <examples>
   <example>
-    <query>Why is the payment service slow?</query>
-    <output>devops</output>
+    <query>How do I reset my password?</query>
+    <output>hr</output>
   </example>
   <example>
-    <query>What is the company policy on remote work?</query>
-    <output>hr</output>
+    <query>What are the latest sales figures?</query>
+    <output>finance</output>
   </example>
 </examples>
 
@@ -136,8 +136,8 @@ STRICT RULES:
     <output>chat</output>
   </example>
   <example>
-    <input>Why is the payment service slow?</input>
-    <output>diagnose</output>
+    <input>What is the status of my order?</input>
+    <output>status</output>
   </example>
   <example>
     <input>Goodbye, thanks for your help</input>
@@ -207,12 +207,12 @@ STRICT RULES:
 <!-- 5. Examples -->
 <examples>
   <example>
-    <input>Auth-Service is failing with timeout errors</input>
-    <output>{{{{"service_name": "Auth-Service", "error_type": "timeout errors", "timeframe": null}}}}</output>
+    <input>Show me orders from last week</input>
+    <output>{{{{"order_id": null, "category": "orders", "timeframe": "last week"}}}}</output>
   </example>
   <example>
-    <input>Database connection issues in the last 2 hours</input>
-    <output>{{{{"service_name": null, "error_type": "connection issues", "timeframe": "last 2 hours"}}}}</output>
+    <input>Delete item SKU-999</input>
+    <output>{{{{"item_id": "SKU-999", "action": "delete", "timeframe": null}}}}</output>
   </example>
 </examples>
 
