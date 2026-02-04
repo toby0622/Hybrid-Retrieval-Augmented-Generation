@@ -205,7 +205,7 @@ def _parse_diagnostic_response(
             DiagnosticStep(
                 id="graph",
                 source="Graph Search",
-                title=f"Knowledge Graph ({len(graph_results)} results)",
+                title=f"Node Stepping ({len(graph_results)} results)",
                 detail=graph_summary,
                 status="info",
                 is_parallel=True,
@@ -223,7 +223,7 @@ def _parse_diagnostic_response(
             DiagnosticStep(
                 id="graph",
                 source="Graph Search",
-                title="Knowledge Graph (0 results)",
+                title="Node Stepping (0 results)",
                 detail="No graph results found for this query.",
                 status="warning",
                 is_parallel=True,
@@ -243,7 +243,7 @@ def _parse_diagnostic_response(
             DiagnosticStep(
                 id="vector",
                 source="Vector Search",
-                title=f"Semantic Search ({len(vector_results)} matches)",
+                title=f"Semantic Processing ({len(vector_results)} matches)",
                 detail=vector_summary,
                 status="info",
                 is_parallel=True,
@@ -265,7 +265,7 @@ def _parse_diagnostic_response(
             DiagnosticStep(
                 id="vector",
                 source="Vector Search",
-                title="Semantic Search (0 matches)",
+                title="Semantic Processing (0 matches)",
                 detail="No relevant documents found.",
                 status="warning",
                 is_parallel=True,
@@ -285,7 +285,7 @@ def _parse_diagnostic_response(
             DiagnosticStep(
                 id="mcp",
                 source="MCP Tool",
-                title=f"Real-time Data ({len(mcp_results)} results)",
+                title=f"SQL Retrieval ({len(mcp_results)} results)",
                 detail=mcp_summary,
                 status="info",
                 is_parallel=True,
@@ -303,7 +303,7 @@ def _parse_diagnostic_response(
             DiagnosticStep(
                 id="mcp",
                 source="MCP Tool",
-                title="Real-time Data (0 results)",
+                title="SQL Retrieval (0 results)",
                 detail="No real-time data available.",
                 status="warning",
                 is_parallel=True,
