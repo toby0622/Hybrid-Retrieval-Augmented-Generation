@@ -188,25 +188,16 @@ def _parse_diagnostic_response(
     mcp_results = mcp_results or []
 
     if graph_results:
-        graph_summary_parts = []
-        for r in graph_results[:5]:
-            title = r.get("title", "Graph Result")
-            content = r.get("content", "")
-            summary = (
-                f"• {title}: {content[:80]}..."
-                if len(content) > 80
-                else f"• {title}: {content}"
-            )
-            graph_summary_parts.append(summary)
-
-        graph_summary = "\n".join(graph_summary_parts)
-
+        # Use the Cypher query from the first result's metadata if available
+        first_result = graph_results[0]
+        cypher_query = first_result.get("metadata", {}).get("cypher_query", "Query info not available")
+        
         steps.append(
             DiagnosticStep(
                 id="graph",
                 source="Graph Search",
                 title=f"Node Stepping ({len(graph_results)} results)",
-                detail=graph_summary,
+                detail=f"Executed Cypher Query:\n{cypher_query}",
                 status="info",
                 is_parallel=True,
                 raw_content={
@@ -224,27 +215,19 @@ def _parse_diagnostic_response(
                 id="graph",
                 source="Graph Search",
                 title="Node Stepping (0 results)",
-                detail="No graph results found for this query.",
+                detail="No graph results found.\nMake sure the knowledge graph is populated.",
                 status="warning",
                 is_parallel=True,
             )
         )
 
     if vector_results:
-        vector_summary_parts = []
-        for r in vector_results[:5]:
-            title = r.get("title", "Document")
-            confidence = r.get("confidence", 0.0)
-            vector_summary_parts.append(f"• {title} (score: {confidence:.2f})")
-
-        vector_summary = "\n".join(vector_summary_parts)
-
         steps.append(
             DiagnosticStep(
                 id="vector",
                 source="Vector Search",
                 title=f"Semantic Processing ({len(vector_results)} matches)",
-                detail=vector_summary,
+                detail=f"Found {len(vector_results)} relevant documents based on semantic similarity.",
                 status="info",
                 is_parallel=True,
                 raw_content={
@@ -266,35 +249,41 @@ def _parse_diagnostic_response(
                 id="vector",
                 source="Vector Search",
                 title="Semantic Processing (0 matches)",
-                detail="No relevant documents found.",
+                detail="No relevant documents found in knowledge base.",
                 status="warning",
                 is_parallel=True,
             )
         )
 
     if mcp_results:
-        mcp_summary_parts = []
-        for r in mcp_results[:5]:
-            title = r.get("title", "Real-time Data")
-            content = r.get("content", "")
-            mcp_summary_parts.append(f"• {title}: {content[:80]}..." if len(content) > 80 else f"• {title}: {content}")
-
-        mcp_summary = "\n".join(mcp_summary_parts)
+        # Use the SQL query from the first result's metadata if available
+        first_result = mcp_results[0]
+        sql_query = first_result.get("metadata", {}).get("sql_query", "SQL info not available")
+        
+        # Prepare data for table view (list of dicts)
+        table_data = []
+        for r in mcp_results:
+            # Prefer using the raw_data which is the original dictionary
+            if r.get("raw_data"):
+                data = r.get("raw_data").copy()
+                # Remove large fields or internal metadata if necessary, but key 'sql_query' isn't in raw_data usually
+                if "sql_query" in data:
+                    del data["sql_query"]
+                table_data.append(data)
+            else:
+                table_data.append({"title": r.get("title"), "content": r.get("content")})
 
         steps.append(
             DiagnosticStep(
                 id="mcp",
                 source="MCP Tool",
                 title=f"SQL Retrieval ({len(mcp_results)} results)",
-                detail=mcp_summary,
+                detail=f"Executed SQL Command:\n{sql_query}",
                 status="info",
                 is_parallel=True,
                 raw_content={
-                    "type": "log",
-                    "data": [
-                        {"title": r.get("title"), "content": r.get("content")}
-                        for r in mcp_results
-                    ],
+                    "type": "table",
+                    "data": table_data,
                 },
             )
         )
@@ -304,7 +293,7 @@ def _parse_diagnostic_response(
                 id="mcp",
                 source="MCP Tool",
                 title="SQL Retrieval (0 results)",
-                detail="No real-time data available.",
+                detail="No real-time data retrieved via SQL.",
                 status="warning",
                 is_parallel=True,
             )

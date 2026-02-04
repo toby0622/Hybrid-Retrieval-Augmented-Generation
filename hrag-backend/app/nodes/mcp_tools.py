@@ -8,6 +8,7 @@ and adds the results to the graph state for use in reasoning.
 from typing import List
 
 from app.mcp_client import MCPDatabaseClient, MCPTools
+from app.nodes.retrieval import _make_serializable
 from app.state import DynamicSlotInfo, GraphState, RetrievalResult, SlotInfo
 from config import settings
 
@@ -46,8 +47,11 @@ async def mcp_tool_node(state: GraphState) -> GraphState:
     
     try:
         if service_name:
-            metrics = await MCPTools.query_service_metrics(service_name, limit=5)
+            metrics, metrics_query = await MCPTools.query_service_metrics(service_name, limit=5)
             for m in metrics:
+                m_with_query = _make_serializable(m.copy())
+                m_with_query["sql_query"] = metrics_query
+                m_serializable = _make_serializable(m)
                 results.append(
                     RetrievalResult(
                         source="mcp_tool",
@@ -55,14 +59,17 @@ async def mcp_tool_node(state: GraphState) -> GraphState:
                         content=f"Service: {m.get('service_name')}\n"
                                 f"Value: {m.get('metric_value')} {m.get('unit', '')}\n"
                                 f"Time: {m.get('timestamp')}",
-                        metadata=m,
+                        metadata=m_with_query,
                         confidence=0.95,
-                        raw_data=m,
+                        raw_data=m_serializable,
                     ).model_dump()
                 )
             
-            health = await MCPTools.get_service_health(service_name)
+            health, health_query = await MCPTools.get_service_health(service_name)
             for h in health:
+                h_with_query = _make_serializable(h.copy())
+                h_with_query["sql_query"] = health_query
+                h_serializable = _make_serializable(h)
                 status = h.get("health_status", "unknown")
                 status_emoji = "✅" if status == "healthy" else "⚠️" if status == "degraded" else "❌"
                 results.append(
@@ -73,19 +80,22 @@ async def mcp_tool_node(state: GraphState) -> GraphState:
                                 f"Status: {status}\n"
                                 f"Last Check: {h.get('last_check')}\n"
                                 f"Details: {h.get('details', 'N/A')}",
-                        metadata=h,
+                        metadata=h_with_query,
                         confidence=0.98,
-                        raw_data=h,
+                        raw_data=h_serializable,
                     ).model_dump()
                 )
         
         log_level = "error" if error_type else None
-        logs = await MCPTools.query_service_logs(
+        logs, logs_query = await MCPTools.query_service_logs(
             service_name=service_name,
             log_level=log_level,
             limit=5
         )
         for log in logs:
+            log_with_query = _make_serializable(log.copy())
+            log_with_query["sql_query"] = logs_query
+            log_serializable = _make_serializable(log)
             level = log.get("log_level", "info").upper()
             results.append(
                 RetrievalResult(
@@ -94,9 +104,9 @@ async def mcp_tool_node(state: GraphState) -> GraphState:
                     content=f"Level: {level}\n"
                             f"Message: {log.get('message', '')}\n"
                             f"Time: {log.get('timestamp')}",
-                    metadata=log,
+                    metadata=log_with_query,
                     confidence=0.90,
-                    raw_data=log,
+                    raw_data=log_serializable,
                 ).model_dump()
             )
     

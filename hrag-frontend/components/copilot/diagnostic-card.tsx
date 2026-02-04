@@ -75,7 +75,7 @@ function DiagnosticNode({ step, isRoot = false, onClick, isExpanded }: Diagnosti
 
         {isExpanded && (
           <div className="border-t border-slate-700/50 bg-slate-950/30 p-3 animate-in slide-in-from-top-2 duration-200">
-            <div className="text-xs text-slate-300 mb-3 leading-relaxed">
+            <div className="text-xs text-slate-300 mb-3 leading-relaxed whitespace-pre-wrap">
               {step.detail}
             </div>
              
@@ -83,11 +83,41 @@ function DiagnosticNode({ step, isRoot = false, onClick, isExpanded }: Diagnosti
               <div className="flex items-center gap-2 text-[10px] text-slate-500 uppercase tracking-wider font-semibold">
                 <Terminal className="w-3 h-3" /> Raw Evidence
               </div>
-              <div className="font-mono text-[10px] leading-relaxed bg-black/60 p-2.5 rounded border border-slate-800/60 text-slate-300 overflow-x-auto whitespace-pre-wrap max-h-48 scrollbar-thin scrollbar-thumb-slate-700">
-                {typeof step.raw_content?.data === 'object' 
-                  ? JSON.stringify(step.raw_content.data, null, 2) 
-                  : String(step.raw_content?.data || '')}
-              </div>
+
+              {step.raw_content?.type === 'table' && Array.isArray(step.raw_content.data) && step.raw_content.data.length > 0 ? (
+                <div className="rounded border border-slate-800/60 overflow-hidden">
+                  <div className="overflow-x-auto max-h-64 scrollbar-thin scrollbar-thumb-slate-700">
+                    <table className="w-full text-left text-[10px]">
+                      <thead className="bg-slate-900 border-b border-slate-800 sticky top-0">
+                        <tr>
+                          {Object.keys(step.raw_content.data[0]).map((key) => (
+                            <th key={key} className="px-3 py-2 font-medium text-slate-400 capitalize whitespace-nowrap">
+                              {key.replace(/_/g, ' ')}
+                            </th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-800/50 bg-slate-950/20">
+                        {step.raw_content.data.map((row: any, i: number) => (
+                          <tr key={i} className="hover:bg-slate-800/30 transition-colors">
+                            {Object.values(row).map((val: any, j: number) => (
+                              <td key={j} className="px-3 py-2 text-slate-300 whitespace-nowrap font-mono">
+                                {String(val)}
+                              </td>
+                            ))}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              ) : (
+                <div className="font-mono text-[10px] leading-relaxed bg-black/60 p-2.5 rounded border border-slate-800/60 text-slate-300 overflow-x-auto whitespace-pre-wrap max-h-48 scrollbar-thin scrollbar-thumb-slate-700">
+                  {typeof step.raw_content?.data === 'object' 
+                    ? JSON.stringify(step.raw_content.data, null, 2) 
+                    : String(step.raw_content?.data || '')}
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -149,7 +179,7 @@ export function DiagnosticCard({ diagnostic, onAction }: DiagnosticCardProps) {
 
         {leafNodes.length > 0 && (
           <div className="bg-slate-800/20 rounded-xl border border-slate-800/50 p-3 pt-4">
-            <div className="flex w-full gap-3 sm:gap-4 justify-center items-start flex-wrap">
+            <div className="flex flex-col w-full gap-3 items-stretch">
               {leafNodes.map((node) => (
                 <DiagnosticNode 
                   key={node.id}

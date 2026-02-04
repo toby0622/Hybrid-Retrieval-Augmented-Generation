@@ -25,7 +25,7 @@ export interface DiagnosticStep {
   is_root?: boolean;
   is_parallel?: boolean;
   raw_content: {
-    type: 'log' | 'graph' | 'markdown';
+    type: 'log' | 'graph' | 'markdown' | 'table';
     data: unknown;
   };
 }

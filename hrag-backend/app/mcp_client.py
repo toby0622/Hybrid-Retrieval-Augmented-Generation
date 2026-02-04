@@ -100,7 +100,7 @@ class MCPTools:
     async def query_service_metrics(
         service_name: str,
         limit: int = 10
-    ) -> List[Dict[str, Any]]:
+    ) -> tuple[List[Dict[str, Any]], str]:
         """
         Query recent metrics for a specific service.
         
@@ -109,7 +109,7 @@ class MCPTools:
             limit: Maximum number of records to return
             
         Returns:
-            List of metric records
+            Tuple of (List of metric records, SQL query string)
         """
         query = """
             SELECT 
@@ -123,16 +123,17 @@ class MCPTools:
             ORDER BY timestamp DESC
             LIMIT $2
         """
-        return await MCPDatabaseClient.execute_query(
+        results = await MCPDatabaseClient.execute_query(
             query, (f"%{service_name}%", limit)
         )
+        return results, query.strip()
     
     @staticmethod
     async def query_service_logs(
         service_name: Optional[str] = None,
         log_level: Optional[str] = None,
         limit: int = 10
-    ) -> List[Dict[str, Any]]:
+    ) -> tuple[List[Dict[str, Any]], str]:
         """
         Query recent log entries.
         
@@ -142,7 +143,7 @@ class MCPTools:
             limit: Maximum number of records to return
             
         Returns:
-            List of log records
+            Tuple of (List of log records, SQL query string)
         """
         conditions = []
         params = []
@@ -172,12 +173,13 @@ class MCPTools:
             ORDER BY timestamp DESC
             LIMIT ${param_idx}
         """
-        return await MCPDatabaseClient.execute_query(query, tuple(params))
+        results = await MCPDatabaseClient.execute_query(query, tuple(params))
+        return results, query.strip()
     
     @staticmethod
     async def get_service_health(
         service_name: str
-    ) -> List[Dict[str, Any]]:
+    ) -> tuple[List[Dict[str, Any]], str]:
         """
         Get current health status for a service.
         
@@ -185,7 +187,7 @@ class MCPTools:
             service_name: Name of the service
             
         Returns:
-            Health status records
+            Tuple of (Health status records, SQL query string)
         """
         query = """
             SELECT 
@@ -198,16 +200,17 @@ class MCPTools:
             ORDER BY last_check DESC
             LIMIT 1
         """
-        return await MCPDatabaseClient.execute_query(
+        results = await MCPDatabaseClient.execute_query(
             query, (f"%{service_name}%",)
         )
+        return results, query.strip()
     
     @staticmethod
     async def query_realtime_data(
         table_name: str,
         filters: Optional[Dict[str, Any]] = None,
         limit: int = 20
-    ) -> List[Dict[str, Any]]:
+    ) -> tuple[List[Dict[str, Any]], str]:
         """
         Generic tool to query any real-time data table.
         
@@ -220,7 +223,7 @@ class MCPTools:
             limit: Maximum number of records
             
         Returns:
-            Query results
+            Tuple of (Query results, SQL query string)
         """
         allowed_tables = [
             "service_metrics",
@@ -230,7 +233,7 @@ class MCPTools:
         ]
         
         if table_name not in allowed_tables:
-            return []
+            return [], ""
         
         conditions = []
         params = []
@@ -254,6 +257,7 @@ class MCPTools:
         """
         
         try:
-            return await MCPDatabaseClient.execute_query(query, tuple(params))
+            results = await MCPDatabaseClient.execute_query(query, tuple(params))
+            return results, query.strip()
         except Exception:
-            return []
+            return [], query.strip()

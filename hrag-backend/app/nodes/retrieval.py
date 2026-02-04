@@ -191,7 +191,7 @@ async def graph_search_node(state: GraphState) -> GraphState:
                                 source="graph",
                                 title=title,
                                 content=content,
-                                metadata=record,
+                                metadata={**record, "cypher_query": cypher},
                                 confidence=0.85,
                                 raw_data=record,
                             ).model_dump()
@@ -205,6 +205,9 @@ async def graph_search_node(state: GraphState) -> GraphState:
 
 
 def _make_serializable(obj: Any) -> Any:
+    from decimal import Decimal
+    from datetime import date, datetime, time, timedelta
+    from uuid import UUID
     from neo4j.time import Date, DateTime, Duration, Time
 
     if isinstance(obj, dict):
@@ -212,6 +215,12 @@ def _make_serializable(obj: Any) -> Any:
     elif isinstance(obj, list):
         return [_make_serializable(v) for v in obj]
     elif isinstance(obj, (DateTime, Date, Time, Duration)):
+        return str(obj)
+    elif isinstance(obj, (datetime, date, time)):
+        return obj.isoformat()
+    elif isinstance(obj, timedelta):
+        return str(obj)
+    elif isinstance(obj, (Decimal, UUID)):
         return str(obj)
     else:
         return obj
