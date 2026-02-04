@@ -30,7 +30,7 @@ The frontend for the **DevOps Incident Response Copilot**, built with **Next.js 
 3.  Set up environment variables:
     Create a `.env.local` file in the `hrag-frontend` directory:
     ```env
-    NEXT_PUBLIC_API_URL=http://localhost:8000
+    NEXT_PUBLIC_API_URL="your_backend_api_url_here"
     ```
 
 ## 🏃 Running the Application

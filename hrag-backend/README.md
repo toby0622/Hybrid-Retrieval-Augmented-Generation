@@ -35,33 +35,12 @@ The backend for the Hybrid RAG system, built with FastAPI, LangGraph, Neo4j, and
     Create a `.env` file (copy from `.env.example`) and populate it:
     ```env
     # LLM Configuration
-    LLM_BASE_URL=...
-    LLM_API_KEY=...
-    LLM_MODEL_NAME=...
-    EMBEDDING_MODEL_NAME=...
+    LLM_BASE_URL="your_llm_api_base_url_here"
+    LLM_API_KEY="your_llm_api_key_here"
+    LLM_MODEL_NAME="your_llm_model_name_here"
+    EMBEDDING_MODEL_NAME="your_embedding_model_name_here"
 
-    # Neo4j Configuration
-    NEO4J_URI=bolt://localhost:7687
-    NEO4J_USER=neo4j
-    NEO4J_PASSWORD=password
-
-    # Qdrant Configuration
-    QDRANT_HOST=localhost
-    QDRANT_PORT=6333
-    QDRANT_COLLECTION=hrag_documents
-
-    # API Configuration
-    API_HOST=0.0.0.0
-    API_PORT=8000
-    DEBUG=true
-
-    # MCP Configuration (Real-time Data)
-    MCP_ENABLED=true
-    MCP_DB_HOST=localhost
-    MCP_DB_PORT=5432
-    MCP_DB_NAME=hrag_mcp
-    MCP_DB_USER=postgres
-    MCP_DB_PASSWORD=password
+    # ... see .env.example for all variables
     ```
 
 ## 🗄️ Database Seeding
