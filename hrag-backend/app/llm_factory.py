@@ -1,9 +1,10 @@
 from typing import List
 
 import httpx
-from langchain_openai import ChatOpenAI
 from app.core.config import settings
 from app.services.auth import token_manager
+from langchain_openai import ChatOpenAI
+
 
 def get_llm():
     """
@@ -11,7 +12,7 @@ def get_llm():
     Injects J2 Token into Authorization header if enabled.
     """
     default_headers = {"Content-Type": "application/json"}
-    
+
     if settings.token_enabled:
         token = token_manager.get_token(token_type="llm")
         if token:
@@ -22,8 +23,7 @@ def get_llm():
         api_key=settings.llm_api_key,
         model=settings.llm_model_name,
         temperature=0.7,
-        default_headers=default_headers
-
+        default_headers=default_headers,
     )
 
 
@@ -39,7 +39,7 @@ async def get_embedding(text: str) -> List[float]:
             payload = {
                 "text": text,
                 "model": settings.embedding_model_name,
-                "encoding-format": "float"
+                "encoding-format": "float",
             }
             response = await client.post(
                 f"{settings.embedding_base_url}",

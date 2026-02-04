@@ -595,9 +595,6 @@ INCIDENT_LOGS = [
 ]
 
 
-
-
-
 async def clear_collection(client: QdrantClient):
     print("🗑️  Clearing existing collection...")
     try:

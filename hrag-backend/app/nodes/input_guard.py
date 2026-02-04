@@ -1,14 +1,12 @@
 import json
 from typing import Literal, Optional
 
+from app.core.config import settings
 from app.domain_config import DomainRegistry
-from app.domain_init import (get_active_domain, list_available_domains,
-                             switch_domain)
+from app.domain_init import get_active_domain, list_available_domains, switch_domain
 from app.llm_factory import get_llm
 from app.state import DynamicSlotInfo, GraphState, SlotInfo
-from app.core.config import settings
 from langchain_core.prompts import ChatPromptTemplate
-
 
 
 def _get_domain_routing_prompt(domains: list) -> ChatPromptTemplate:
@@ -233,43 +231,45 @@ Schema: {schema_str}"""
 
 async def input_guard_node(state: GraphState) -> GraphState:
     query = state.get("query", "")
-    
+
     clarification_response = state.get("clarification_response")
     if clarification_response:
         current_domain = get_active_domain()
-        
-        print(f"[InputGuard] Processing clarification response: {clarification_response}")
-        
+
+        print(
+            f"[InputGuard] Processing clarification response: {clarification_response}"
+        )
+
         if current_domain and state.get("slots"):
             llm = get_llm()
             extraction_prompt = _get_slot_extraction_prompt(current_domain)
             extraction_chain = extraction_prompt | llm
-            
+
             existing_slots = state.get("slots")
             if isinstance(existing_slots, SlotInfo):
                 existing_slots = existing_slots.to_dynamic()
-            
+
             original_query = state.get("original_query", "")
             prev_clarification = state.get("clarification_question", "")
-            
+
             enriched_query = f"""Original query: {original_query}
 System asked: {prev_clarification}
 User answered: {clarification_response}"""
-            
+
             print(f"[InputGuard] Enriched context for extraction: {enriched_query}")
-            
+
             try:
                 result = await extraction_chain.ainvoke({"query": enriched_query})
                 content = result.content.strip()
-                
+
                 # Normalize smart quotes to standard quotes
                 content = content.replace("“", '"').replace("”", '"')
-                
+
                 print(f"[InputGuard] Raw extraction result: {repr(content)}")
-                
+
                 if not content.startswith("{"):
                     content = "{" + content
-                
+
                 if "```" in content:
                     parts = content.split("```")
                     for part in parts:
@@ -279,23 +279,24 @@ User answered: {clarification_response}"""
                         elif part.strip().startswith("{"):
                             content = part.strip()
                             break
-                
+
                 brace_count = content.count("{") - content.count("}")
                 if brace_count > 0:
                     content = content + "}" * brace_count
-                
+
                 print(f"[InputGuard] Cleaned JSON: {content}")
-                
+
                 slot_data = json.loads(content)
-                
+
                 for key, value in slot_data.items():
                     if value is not None:
                         existing_slots.set_slot(key, value)
                         print(f"[InputGuard] Set slot {key} = {value}")
-                
+
             except json.JSONDecodeError as e:
                 print(f"[InputGuard] JSON parse error: {e}")
                 import re
+
                 pattern = r'"(\w+)":\s*"([^"]+)"'
                 matches = re.findall(pattern, content)
                 for key, value in matches:
@@ -304,9 +305,9 @@ User answered: {clarification_response}"""
                         print(f"[InputGuard] Fallback set slot {key} = {value}")
             except Exception as e:
                 print(f"[InputGuard] Clarification slot extraction error: {e}")
-            
+
             print(f"[InputGuard] Final slots: {existing_slots.get_filled_slots()}")
-            
+
             return {
                 **state,
                 "slots": existing_slots,

@@ -1,9 +1,8 @@
+from app.core.config import settings
 from app.domain_init import get_active_domain
 from app.llm_factory import get_llm
 from app.state import DynamicSlotInfo, GraphState, SlotInfo
-from app.core.config import settings
 from langchain_core.prompts import ChatPromptTemplate
-
 
 
 def _get_clarification_prompt(domain_config) -> ChatPromptTemplate:

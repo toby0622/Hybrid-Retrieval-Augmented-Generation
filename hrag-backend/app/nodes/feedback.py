@@ -1,11 +1,9 @@
 from typing import Any, Dict, List
 
+from app.core.config import settings
 from app.llm_factory import get_llm
 from app.state import GraphState, SlotInfo
-from app.core.config import settings
 from langchain_core.prompts import ChatPromptTemplate
-
-
 
 CASE_STUDY_PROMPT = ChatPromptTemplate.from_messages(
     [
@@ -110,9 +108,9 @@ async def _generate_case_study(state: GraphState) -> GraphState:
 
     if not diagnostic:
         return {
-            **state, 
+            **state,
             "case_study_generated": False,
-            "response": "Cannot generate case study: No diagnostic analysis found."
+            "response": "Cannot generate case study: No diagnostic analysis found.",
         }
 
     diagnostic_summary = "\n".join(
@@ -132,11 +130,11 @@ async def _generate_case_study(state: GraphState) -> GraphState:
             }
         )
         case_study_content = result.content
-        
+
         ingest_result = await ingest_document(
             content=case_study_content,
             filename=f"CaseStudy_{slots.service_name}_{slots.error_type}.md",
-            doc_type="case_study"
+            doc_type="case_study",
         )
 
         success_msg = f"\n\n**Case Study Generated and Archived**\n- Domain: {ingest_result.domain}\n- Entities: {ingest_result.entities_created}\n- Status: {ingest_result.status}"
@@ -152,7 +150,7 @@ async def _generate_case_study(state: GraphState) -> GraphState:
             **state,
             "case_study_generated": False,
             "error": f"Case study generation failed: {e}",
-            "response": f"Failed to generate case study: {e}"
+            "response": f"Failed to generate case study: {e}",
         }
 
 

@@ -3,18 +3,21 @@ from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 
 import httpx
+from app.core.config import settings
+from app.core.logger import logger
 from app.domain_config import DomainRegistry
-from app.domain_init import (get_active_domain, list_available_domains,
-                             load_domain_config)
+from app.domain_init import (
+    get_active_domain,
+    list_available_domains,
+    load_domain_config,
+)
 from app.llm_factory import get_embedding, get_llm
 from app.schema_registry import SchemaRegistry
 from app.services.auth import token_manager
-from app.core.config import settings
 from langchain_core.prompts import ChatPromptTemplate
 from neo4j import AsyncGraphDatabase
 from qdrant_client import QdrantClient
 from qdrant_client.models import PointStruct
-from app.core.logger import logger
 
 
 @dataclass
@@ -33,9 +36,6 @@ class IngestResult:
     relations_created: int
     vectors_created: int
     errors: List[str] = field(default_factory=list)
-
-
-
 
 
 def _build_extraction_prompt(schema) -> ChatPromptTemplate:
@@ -208,7 +208,6 @@ async def write_entities_to_neo4j(entities: List[ExtractedEntity]) -> tuple[int,
                             rels_created += 1
                         except Exception as rel_err:
                             logger.error(f"Relation error: {rel_err}")
-
 
     except Exception as e:
         logger.error(f"Neo4j write error: {e}")

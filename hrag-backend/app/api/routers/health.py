@@ -1,20 +1,20 @@
-from fastapi import APIRouter
-from app.schemas.common import HealthResponse
 from app.core.config import settings
 from app.core.logger import logger
+from app.schemas.common import HealthResponse
+from fastapi import APIRouter
 
 router = APIRouter()
+
 
 @router.get("/health", response_model=HealthResponse)
 async def health_check():
     import asyncio
-    
+
     async def check_service(check_func, timeout=2.0):
         try:
             loop = asyncio.get_running_loop()
             return await asyncio.wait_for(
-                loop.run_in_executor(None, check_func), 
-                timeout=timeout
+                loop.run_in_executor(None, check_func), timeout=timeout
             )
         except asyncio.TimeoutError:
             return "timeout"
@@ -25,6 +25,7 @@ async def health_check():
     def check_neo4j_sync():
         try:
             from neo4j import GraphDatabase
+
             driver = GraphDatabase.driver(
                 settings.neo4j_uri, auth=(settings.neo4j_user, settings.neo4j_password)
             )
@@ -39,7 +40,10 @@ async def health_check():
     def check_qdrant_sync():
         try:
             from qdrant_client import QdrantClient
-            client = QdrantClient(host=settings.qdrant_host, port=settings.qdrant_port, timeout=2.0)
+
+            client = QdrantClient(
+                host=settings.qdrant_host, port=settings.qdrant_port, timeout=2.0
+            )
             client.get_collections()
             return "connected"
         except Exception as e:
@@ -56,13 +60,17 @@ async def health_check():
     )
 
     return HealthResponse(
-        status=overall_status, neo4j=neo4j_status, qdrant=qdrant_status, model_name=settings.llm_model_name
+        status=overall_status,
+        neo4j=neo4j_status,
+        qdrant=qdrant_status,
+        model_name=settings.llm_model_name,
     )
+
 
 @router.get("/stats")
 async def get_stats():
     from app.services.gardener import gardener_tasks
-    
+
     indexed_documents = 0
     knowledge_nodes = 0
 

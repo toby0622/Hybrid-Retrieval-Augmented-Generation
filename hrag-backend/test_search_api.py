@@ -1,8 +1,9 @@
-
-import requests
 import json
 
+import requests
+
 BASE_URL = "http://localhost:8000"
+
 
 def test_search():
     print("Testing Document Search...")
@@ -42,6 +43,7 @@ def test_search():
 
     except Exception as e:
         print(f"Node search test error: {e}")
+
 
 if __name__ == "__main__":
     test_search()

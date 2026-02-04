@@ -1,9 +1,8 @@
+from app.core.config import settings
 from app.domain_init import get_active_domain
 from app.llm_factory import get_llm
 from app.state import DiagnosticResponse, GraphState, Message
-from app.core.config import settings
 from langchain_core.prompts import ChatPromptTemplate
-
 
 
 def _get_chat_prompt(domain_config) -> ChatPromptTemplate:
@@ -79,7 +78,7 @@ async def chat_response_node(state: GraphState) -> GraphState:
 
 async def clarification_response_node(state: GraphState) -> GraphState:
     clarification = state.get("clarification_question", "")
-    
+
     original_query = state.get("original_query") or state.get("query", "")
 
     return {
@@ -120,15 +119,12 @@ async def diagnostic_response_node(state: GraphState) -> GraphState:
 async def end_conversation_node(state: GraphState) -> GraphState:
     current_domain = get_active_domain()
     name = current_domain.display_name if current_domain else "the system"
-    
+
     goodbye_msg = f"Thank you for using {name}. The conversation has ended. Feel free to start a new conversation anytime!"
 
     if state.get("case_study_generated"):
         current_response = state.get("response", "")
-        return {
-            **state,
-            "response": f"{current_response}\n\n---\n\n{goodbye_msg}"
-        }
+        return {**state, "response": f"{current_response}\n\n---\n\n{goodbye_msg}"}
 
     return {
         **state,

@@ -1,13 +1,18 @@
 import re
 from typing import List
 
+from app.core.config import settings
 from app.domain_init import get_active_domain
 from app.llm_factory import get_llm
-from app.state import (DiagnosticResponse, DiagnosticStep, DynamicSlotInfo,
-                       GraphState, RetrievalResult, SlotInfo)
-from app.core.config import settings
+from app.state import (
+    DiagnosticResponse,
+    DiagnosticStep,
+    DynamicSlotInfo,
+    GraphState,
+    RetrievalResult,
+    SlotInfo,
+)
 from langchain_core.prompts import ChatPromptTemplate
-
 
 
 def _get_reasoning_prompt(domain_config) -> ChatPromptTemplate:
@@ -97,10 +102,6 @@ Structure your response as follows:
     )
 
 
-
-
-
-
 async def reasoning_node(state: GraphState) -> GraphState:
     query = state.get("query", "")
     slots = state.get("slots")
@@ -151,7 +152,11 @@ async def reasoning_node(state: GraphState) -> GraphState:
         llm_analysis = f"Analysis error: {e}"
 
     diagnostic = _parse_diagnostic_response(
-        llm_analysis, query, graph_results=graph_results, vector_results=vector_results, mcp_results=mcp_results
+        llm_analysis,
+        query,
+        graph_results=graph_results,
+        vector_results=vector_results,
+        mcp_results=mcp_results,
     )
 
     return {
@@ -189,8 +194,10 @@ def _parse_diagnostic_response(
 
     if graph_results:
         first_result = graph_results[0]
-        cypher_query = first_result.get("metadata", {}).get("cypher_query", "Query info not available")
-        
+        cypher_query = first_result.get("metadata", {}).get(
+            "cypher_query", "Query info not available"
+        )
+
         steps.append(
             DiagnosticStep(
                 id="graph",
@@ -256,8 +263,10 @@ def _parse_diagnostic_response(
 
     if mcp_results:
         first_result = mcp_results[0]
-        sql_query = first_result.get("metadata", {}).get("sql_query", "SQL info not available")
-        
+        sql_query = first_result.get("metadata", {}).get(
+            "sql_query", "SQL info not available"
+        )
+
         table_data = []
         for r in mcp_results:
             if r.get("raw_data"):
@@ -266,7 +275,9 @@ def _parse_diagnostic_response(
                     del data["sql_query"]
                 table_data.append(data)
             else:
-                table_data.append({"title": r.get("title"), "content": r.get("content")})
+                table_data.append(
+                    {"title": r.get("title"), "content": r.get("content")}
+                )
 
         steps.append(
             DiagnosticStep(

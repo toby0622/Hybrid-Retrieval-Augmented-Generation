@@ -2,12 +2,12 @@ import asyncio
 from typing import Any, List, Optional
 
 import httpx
+from app.core.config import settings
 from app.domain_init import get_active_domain
 from app.llm_factory import get_embedding, get_llm
 from app.schema_registry import SchemaRegistry
 from app.services.auth import token_manager
 from app.state import DynamicSlotInfo, GraphState, RetrievalResult, SlotInfo
-from app.core.config import settings
 from langchain_core.prompts import ChatPromptTemplate
 from neo4j import AsyncGraphDatabase
 from qdrant_client import QdrantClient
@@ -121,9 +121,6 @@ class QdrantClientWrapper:
         return cls._client
 
 
-
-
-
 async def graph_search_node(state: GraphState) -> GraphState:
     slots = state.get("slots")
     if isinstance(slots, SlotInfo):
@@ -205,9 +202,10 @@ async def graph_search_node(state: GraphState) -> GraphState:
 
 
 def _make_serializable(obj: Any) -> Any:
-    from decimal import Decimal
     from datetime import date, datetime, time, timedelta
+    from decimal import Decimal
     from uuid import UUID
+
     from neo4j.time import Date, DateTime, Duration, Time
 
     if isinstance(obj, dict):

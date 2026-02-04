@@ -2,10 +2,12 @@ from app.nodes.feedback import feedback_node, route_after_feedback
 from app.nodes.input_guard import input_guard_node, route_after_guard
 from app.nodes.mcp_tools import mcp_tool_node
 from app.nodes.reasoning import reasoning_node
-from app.nodes.response import (chat_response_node,
-                                clarification_response_node,
-                                diagnostic_response_node,
-                                end_conversation_node)
+from app.nodes.response import (
+    chat_response_node,
+    clarification_response_node,
+    diagnostic_response_node,
+    end_conversation_node,
+)
 from app.nodes.retrieval import hybrid_retrieval_node
 from app.nodes.slot_filling import route_after_slot_check, slot_check_node
 from app.state import GraphState
@@ -95,9 +97,8 @@ async def run_query(
     except Exception:
         pass
 
-    is_clarification_response = (
-        existing_state 
-        and existing_state.get("awaiting_clarification", False)
+    is_clarification_response = existing_state and existing_state.get(
+        "awaiting_clarification", False
     )
 
     if is_clarification_response:

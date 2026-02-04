@@ -19,9 +19,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 import asyncpg
-
 from config import settings
-
 
 CREATE_TABLES_SQL = """
 -- Service Metrics Table
@@ -124,9 +122,11 @@ SAMPLE_LOG_MESSAGES = {
 
 async def seed_database():
     """Create tables and insert sample data."""
-    print(f"[MCP Seed] Connecting to PostgreSQL at {settings.mcp_db_host}:{settings.mcp_db_port}")
+    print(
+        f"[MCP Seed] Connecting to PostgreSQL at {settings.mcp_db_host}:{settings.mcp_db_port}"
+    )
     print(f"[MCP Seed] Database: {settings.mcp_db_name}")
-    
+
     try:
         conn = await asyncpg.connect(
             host=settings.mcp_db_host,
@@ -138,27 +138,32 @@ async def seed_database():
     except Exception as e:
         print(f"[MCP Seed] Connection failed: {e}")
         print("[MCP Seed] Make sure PostgreSQL is running and database exists.")
-        print(f"[MCP Seed] Create database with: CREATE DATABASE {settings.mcp_db_name};")
+        print(
+            f"[MCP Seed] Create database with: CREATE DATABASE {settings.mcp_db_name};"
+        )
         return False
-    
+
     print("[MCP Seed] Connected successfully!")
-    
+
     print("[MCP Seed] Creating tables...")
     await conn.execute(CREATE_TABLES_SQL)
     print("[MCP Seed] Tables created.")
-    
+
     print("[MCP Seed] Clearing existing data...")
-    await conn.execute("TRUNCATE service_metrics, service_logs, service_health, realtime_data RESTART IDENTITY")
-    
+    await conn.execute(
+        "TRUNCATE service_metrics, service_logs, service_health, realtime_data RESTART IDENTITY"
+    )
+
     print("[MCP Seed] Inserting sample metrics...")
     import random
+
     now = datetime.now()
-    
+
     for service in SAMPLE_SERVICES:
         for metric_name, unit in SAMPLE_METRICS:
             for i in range(10):
                 timestamp = now - timedelta(minutes=i * 5)
-                
+
                 if metric_name == "cpu_usage":
                     value = random.uniform(15, 85)
                 elif metric_name == "memory_usage":
@@ -171,40 +176,47 @@ async def seed_database():
                     value = random.randint(10, 200)
                 else:
                     value = random.uniform(100, 1000)
-                
+
                 await conn.execute(
                     """
                     INSERT INTO service_metrics (service_name, metric_name, metric_value, unit, timestamp)
                     VALUES ($1, $2, $3, $4, $5)
                     """,
-                    service, metric_name, round(value, 2), unit, timestamp
+                    service,
+                    metric_name,
+                    round(value, 2),
+                    unit,
+                    timestamp,
                 )
-    
+
     print("[MCP Seed] Inserting sample logs...")
     for service in SAMPLE_SERVICES:
         for i in range(20):
             timestamp = now - timedelta(minutes=i * 3)
             log_level = random.choice(LOG_LEVELS)
-            
+
             if service in ["payment-service", "auth-service"] and i < 5:
                 log_level = "ERROR"
-            
+
             messages = SAMPLE_LOG_MESSAGES[log_level]
             message = random.choice(messages)
-            
+
             await conn.execute(
                 """
                 INSERT INTO service_logs (service_name, log_level, message, timestamp)
                 VALUES ($1, $2, $3, $4)
                 """,
-                service, log_level, message, timestamp
+                service,
+                log_level,
+                message,
+                timestamp,
             )
-    
+
     print("[MCP Seed] Inserting service health status...")
     health_states = ["healthy", "healthy", "healthy", "degraded", "unhealthy"]
     for service in SAMPLE_SERVICES:
         status = random.choice(health_states)
-        
+
         if service == "payment-service":
             status = "degraded"
             details = "High latency detected, investigating root cause"
@@ -212,16 +224,21 @@ async def seed_database():
             status = "unhealthy"
             details = "Connection to identity provider failed"
         else:
-            details = "All checks passed" if status == "healthy" else "Minor issues detected"
-        
+            details = (
+                "All checks passed" if status == "healthy" else "Minor issues detected"
+            )
+
         await conn.execute(
             """
             INSERT INTO service_health (service_name, health_status, last_check, details)
             VALUES ($1, $2, $3, $4)
             """,
-            service, status, now, details
+            service,
+            status,
+            now,
+            details,
         )
-    
+
     print("[MCP Seed] Inserting sample real-time data...")
     realtime_entries = [
         ("cluster_info", "active_nodes", "5", {"region": "us-west-2"}),
@@ -229,19 +246,24 @@ async def seed_database():
         ("deployment", "latest_version", "v2.3.1", {"service": "api-gateway"}),
         ("alert", "active_alerts", "2", {"severity": "warning"}),
     ]
-    
+
     for data_type, data_key, data_value, metadata in realtime_entries:
         import json
+
         await conn.execute(
             """
             INSERT INTO realtime_data (data_type, data_key, data_value, metadata, timestamp)
             VALUES ($1, $2, $3, $4, $5)
             """,
-            data_type, data_key, data_value, json.dumps(metadata), now
+            data_type,
+            data_key,
+            data_value,
+            json.dumps(metadata),
+            now,
         )
-    
+
     await conn.close()
-    
+
     print("[MCP Seed] ✅ Database seeded successfully!")
     print(f"[MCP Seed] Inserted data for {len(SAMPLE_SERVICES)} services")
     return True

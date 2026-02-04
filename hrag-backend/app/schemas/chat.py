@@ -1,7 +1,8 @@
 from typing import List, Optional
-from pydantic import BaseModel
 
 from app.state import DiagnosticResponse
+from pydantic import BaseModel
+
 
 class ReasoningStep(BaseModel):
     id: str

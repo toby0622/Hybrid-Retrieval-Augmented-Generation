@@ -1,9 +1,9 @@
 from pathlib import Path
 from typing import Optional
 
+from app.core.config import settings
 from app.domain_config import DomainConfig, DomainRegistry
 from app.schema_registry import Schema, SchemaRegistry
-from app.core.config import settings
 
 
 def initialize_domain_system(
@@ -40,9 +40,11 @@ def initialize_domain_system(
 
     if not active_domain:
         if domains:
-            print(f"   [INFO] No active domain configured, defaulting to '{domains[0]}'")
+            print(
+                f"   [INFO] No active domain configured, defaulting to '{domains[0]}'"
+            )
             active_domain = domains[0]
-    
+
     if active_domain not in domains:
         print(f"   [WARN] Domain '{active_domain}' not found, using first available")
         active_domain = domains[0]

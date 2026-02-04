@@ -1,8 +1,6 @@
 import uuid
 from typing import List, Optional
 
-from fastapi import APIRouter, BackgroundTasks, File, HTTPException, UploadFile
-
 from app.core.config import settings
 from app.core.logger import logger
 from app.core.utils import serialize_neo4j_properties
@@ -23,6 +21,7 @@ from app.services.gardener import (
     get_task,
     remove_task,
 )
+from fastapi import APIRouter, BackgroundTasks, File, HTTPException, UploadFile
 
 router = APIRouter()
 
@@ -151,26 +150,22 @@ async def gardener_action(action: GardenerAction):
 
 
 @router.get("/documents", response_model=List[DocumentResponse])
-async def list_documents(limit: int = 50, offset: Optional[str] = None, search: Optional[str] = None):
+async def list_documents(
+    limit: int = 50, offset: Optional[str] = None, search: Optional[str] = None
+):
     try:
         from qdrant_client import QdrantClient
-        from qdrant_client.models import Filter, FieldCondition, MatchText
+        from qdrant_client.models import FieldCondition, Filter, MatchText
 
         client = QdrantClient(host=settings.qdrant_host, port=settings.qdrant_port)
-        
+
         scroll_filter = None
-        
+
         if search:
             scroll_filter = Filter(
                 should=[
-                    FieldCondition(
-                        key="content",
-                        match=MatchText(text=search)
-                    ),
-                    FieldCondition(
-                        key="title",
-                        match=MatchText(text=search)
-                    )
+                    FieldCondition(key="content", match=MatchText(text=search)),
+                    FieldCondition(key="title", match=MatchText(text=search)),
                 ]
             )
 
@@ -180,19 +175,17 @@ async def list_documents(limit: int = 50, offset: Optional[str] = None, search: 
             limit=limit,
             offset=offset,
             with_payload=True,
-            with_vectors=False
+            with_vectors=False,
         )
-        
+
         documents = []
         for record in records:
             payload = record.payload or {}
             content = payload.get("content", "")
-            documents.append(DocumentResponse(
-                id=record.id,
-                content=content,
-                metadata=payload
-            ))
-            
+            documents.append(
+                DocumentResponse(id=record.id, content=content, metadata=payload)
+            )
+
         return documents
     except Exception as e:
         logger.exception(f"Error listing documents: {e}")
@@ -203,9 +196,9 @@ async def list_documents(limit: int = 50, offset: Optional[str] = None, search: 
 async def get_document(doc_id: str):
     try:
         from qdrant_client import QdrantClient
-        
+
         client = QdrantClient(host=settings.qdrant_host, port=settings.qdrant_port)
-        
+
         try:
             point_id = int(doc_id)
         except ValueError:
@@ -215,19 +208,17 @@ async def get_document(doc_id: str):
             collection_name=settings.qdrant_collection,
             ids=[point_id],
             with_payload=True,
-            with_vectors=False
+            with_vectors=False,
         )
-        
+
         if not points:
             raise HTTPException(status_code=404, detail="Document not found")
-            
+
         point = points[0]
         payload = point.payload or {}
-        
+
         return DocumentResponse(
-            id=point.id,
-            content=payload.get("content", ""),
-            metadata=payload
+            id=point.id, content=payload.get("content", ""), metadata=payload
         )
     except HTTPException:
         raise
@@ -239,48 +230,44 @@ async def get_document(doc_id: str):
 @router.put("/documents/{doc_id}")
 async def update_document(doc_id: str, request: UpdateDocumentRequest):
     try:
+        from app.services.ingestion import get_embedding
         from qdrant_client import QdrantClient
         from qdrant_client.models import PointStruct
-        from app.services.ingestion import get_embedding
-        
+
         client = QdrantClient(host=settings.qdrant_host, port=settings.qdrant_port)
-        
+
         try:
             point_id = int(doc_id)
         except ValueError:
             point_id = doc_id
-            
+
         points = client.retrieve(
             collection_name=settings.qdrant_collection,
             ids=[point_id],
             with_payload=True,
-            with_vectors=False
+            with_vectors=False,
         )
-        
+
         if not points:
             raise HTTPException(status_code=404, detail="Document not found")
-            
+
         existing_payload = points[0].payload or {}
         existing_payload["content"] = request.content
-        
+
         filename = existing_payload.get("title", "")
         embed_text = f"{filename}\n\n{request.content}" if filename else request.content
-        
+
         new_embedding = await get_embedding(embed_text)
-        
+
         client.upsert(
             collection_name=settings.qdrant_collection,
             points=[
-                PointStruct(
-                    id=point_id,
-                    vector=new_embedding,
-                    payload=existing_payload
-                )
-            ]
+                PointStruct(id=point_id, vector=new_embedding, payload=existing_payload)
+            ],
         )
-        
+
         return {"status": "success", "message": "Document updated and re-indexed"}
-        
+
     except HTTPException:
         raise
     except Exception as e:
@@ -296,7 +283,7 @@ async def list_nodes(limit: int = 50, offset: int = 0, search: Optional[str] = N
         driver = GraphDatabase.driver(
             settings.neo4j_uri, auth=(settings.neo4j_user, settings.neo4j_password)
         )
-        
+
         nodes = []
         with driver.session() as session:
             try:
@@ -309,22 +296,24 @@ async def list_nodes(limit: int = 50, offset: int = 0, search: Optional[str] = N
                     SKIP $img_offset LIMIT $img_limit
                     """
                     result = session.run(
-                        query,
-                        img_offset=offset, img_limit=limit, search=search
+                        query, img_offset=offset, img_limit=limit, search=search
                     )
                 else:
                     result = session.run(
                         "MATCH (n) RETURN n, elementId(n) as eid ORDER BY eid SKIP $img_offset LIMIT $img_limit",
-                        img_offset=offset, img_limit=limit
+                        img_offset=offset,
+                        img_limit=limit,
                     )
-                    
+
                 for record in result:
                     node = record["n"]
-                    nodes.append(NodeResponse(
-                        id=record["eid"],
-                        labels=list(node.labels),
-                        properties=serialize_neo4j_properties(dict(node))
-                    ))
+                    nodes.append(
+                        NodeResponse(
+                            id=record["eid"],
+                            labels=list(node.labels),
+                            properties=serialize_neo4j_properties(dict(node)),
+                        )
+                    )
             except Exception:
                 if search:
                     query = """
@@ -335,23 +324,25 @@ async def list_nodes(limit: int = 50, offset: int = 0, search: Optional[str] = N
                     SKIP $img_offset LIMIT $img_limit
                     """
                     result = session.run(
-                        query,
-                        img_offset=offset, img_limit=limit, search=search
+                        query, img_offset=offset, img_limit=limit, search=search
                     )
                 else:
                     result = session.run(
                         "MATCH (n) RETURN n, id(n) as nid ORDER BY nid SKIP $img_offset LIMIT $img_limit",
-                        img_offset=offset, img_limit=limit
+                        img_offset=offset,
+                        img_limit=limit,
                     )
-                
+
                 for record in result:
                     node = record["n"]
-                    nodes.append(NodeResponse(
-                        id=str(record["nid"]),
-                        labels=list(node.labels),
-                        properties=serialize_neo4j_properties(dict(node))
-                    ))
-                    
+                    nodes.append(
+                        NodeResponse(
+                            id=str(record["nid"]),
+                            labels=list(node.labels),
+                            properties=serialize_neo4j_properties(dict(node)),
+                        )
+                    )
+
         driver.close()
         return nodes
     except Exception as e:
@@ -367,35 +358,35 @@ async def get_node(node_id: str):
         driver = GraphDatabase.driver(
             settings.neo4j_uri, auth=(settings.neo4j_user, settings.neo4j_password)
         )
-        
+
         with driver.session() as session:
             result = session.run(
                 "MATCH (n) WHERE elementId(n) = $node_id RETURN n, elementId(n) as eid",
-                node_id=node_id
+                node_id=node_id,
             )
             record = result.single()
-            
+
             if not record:
                 if node_id.isdigit():
                     result = session.run(
                         "MATCH (n) WHERE id(n) = $node_id RETURN n, id(n) as nid",
-                        node_id=int(node_id)
+                        node_id=int(node_id),
                     )
                     record = result.single()
 
             if not record:
                 driver.close()
                 raise HTTPException(status_code=404, detail="Node not found")
-                
+
             node = record["n"]
             response_id = record.get("eid") or str(record.get("nid"))
-            
+
             response = NodeResponse(
                 id=response_id,
                 labels=list(node.labels),
-                properties=serialize_neo4j_properties(dict(node))
+                properties=serialize_neo4j_properties(dict(node)),
             )
-            
+
         driver.close()
         return response
     except HTTPException:
@@ -413,30 +404,35 @@ async def update_node(node_id: str, request: UpdateNodeRequest):
         driver = GraphDatabase.driver(
             settings.neo4j_uri, auth=(settings.neo4j_user, settings.neo4j_password)
         )
-        
+
         with driver.session() as session:
             query = ""
             if node_id.isdigit():
-                 query = """
+                query = """
                  MATCH (n)
                  WHERE elementId(n) = $node_id OR id(n) = $int_id
                  SET n += $props
                  RETURN n
                  """
-                 result = session.run(query, node_id=node_id, int_id=int(node_id), props=request.properties)
+                result = session.run(
+                    query,
+                    node_id=node_id,
+                    int_id=int(node_id),
+                    props=request.properties,
+                )
             else:
-                 query = """
+                query = """
                  MATCH (n)
                  WHERE elementId(n) = $node_id
                  SET n += $props
                  RETURN n
                  """
-                 result = session.run(query, node_id=node_id, props=request.properties)
-            
+                result = session.run(query, node_id=node_id, props=request.properties)
+
             if not result.single():
                 driver.close()
                 raise HTTPException(status_code=404, detail="Node not found")
-                
+
         driver.close()
         return {"status": "success", "message": "Node properties updated"}
     except HTTPException:

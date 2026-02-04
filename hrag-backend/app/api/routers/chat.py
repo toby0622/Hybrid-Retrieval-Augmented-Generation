@@ -3,14 +3,14 @@ import json
 import uuid
 from typing import AsyncGenerator
 
+from app.core.logger import logger
+from app.graph import run_query
+from app.schemas.chat import ChatRequest, ChatResponse, ReasoningStep
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
 
-from app.graph import run_query
-from app.core.logger import logger
-from app.schemas.chat import ChatRequest, ChatResponse, ReasoningStep
-
 router = APIRouter()
+
 
 @router.post("/chat/stream")
 async def chat_stream(request: ChatRequest):
