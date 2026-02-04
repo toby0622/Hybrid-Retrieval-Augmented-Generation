@@ -16,7 +16,8 @@ def test_token_exchange():
     # Mock settings
     settings.token_enabled = True
     settings.token_url = "http://mock-auth/token"
-    settings.j1_token = "mock-j1-token"
+    settings.llm_j1_token = "mock-j1-token-llm"
+    settings.embed_j1_token = "mock-j1-token-embed"
     
     # Mock httpx.Client
     with patch("httpx.Client") as mock_client:
@@ -32,20 +33,35 @@ def test_token_exchange():
         mock_client.return_value.__enter__.return_value.post.return_value = mock_response
         
         # Reset token manager
-        token_manager._token = None
-        token_manager._expires_at = None
+        token_manager._tokens = {"llm": None, "embedding": None}
+        token_manager._expires_at = {"llm": None, "embedding": None}
         
-        # Test exchange
-        token = token_manager.get_token()
+        # Test exchange for LLM
+        token_llm = token_manager.get_token("llm")
         
-        print(f"Token retrieved: {token}")
-        assert token == "mock-j2-token"
-        assert token_manager._is_token_valid()
+        print(f"LLM Token retrieved: {token_llm}")
+        assert token_llm == "mock-j2-token"
+        assert token_manager._is_token_valid("llm")
         
-        # Verify call
-        mock_client.return_value.__enter__.return_value.post.assert_called_with(
+        # Verify call for LLM
+        mock_client.return_value.__enter__.return_value.post.assert_any_call(
             "http://mock-auth/token",
-            json={"key": "mock-j1-token"},
+            json={"key": "mock-j1-token-llm"},
+            headers={"Content-Type": "application/json"}
+        )
+
+        # Test exchange for Embedding
+        # Reset mock to allow new call (or just check calls)
+        # Simplify: assume same return value for now
+        token_embed = token_manager.get_token("embedding")
+        print(f"Embedding Token retrieved: {token_embed}")
+        assert token_embed == "mock-j2-token"
+        assert token_manager._is_token_valid("embedding")
+        
+         # Verify call for Embedding
+        mock_client.return_value.__enter__.return_value.post.assert_any_call(
+            "http://mock-auth/token",
+            json={"key": "mock-j1-token-embed"},
             headers={"Content-Type": "application/json"}
         )
         print("Token exchange test passed!")

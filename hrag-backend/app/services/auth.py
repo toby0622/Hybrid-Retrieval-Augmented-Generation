@@ -4,75 +4,84 @@ from config import settings
 
 class TokenManager:
     _instance = None
-    _token: str | None = None
-    _expires_at: datetime | None = None
+    _tokens: dict[str, str | None] = {}
+    _expires_at: dict[str, datetime | None] = {}
 
     def __new__(cls):
         if cls._instance is None:
             cls._instance = super(TokenManager, cls).__new__(cls)
+            cls._instance._tokens = {"llm": None, "embedding": None}
+            cls._instance._expires_at = {"llm": None, "embedding": None}
         return cls._instance
 
-    def get_token(self) -> str | None:
+    def get_token(self, token_type: str = "llm") -> str | None:
         """
-        Returns the current valid token (J2 Token).
+        Returns the current valid token (J2 Token) for the specified type.
+        token_type: "llm" or "embedding"
         If the token is missing or expired, it initiates a token exchange.
         """
         if not settings.token_enabled:
             return None
 
-        if self._is_token_valid():
-            return self._token
+        if self._is_token_valid(token_type):
+            return self._tokens.get(token_type)
 
-        return self._exchange_token()
+        return self._exchange_token(token_type)
 
-    def _is_token_valid(self) -> bool:
-        if not self._token or not self._expires_at:
+    def _is_token_valid(self, token_type: str) -> bool:
+        token = self._tokens.get(token_type)
+        expires_at = self._expires_at.get(token_type)
+        
+        if not token or not expires_at:
             return False
         
         # Check against current UTC time with a safety buffer (e.g., 60 seconds)
         now = datetime.now(timezone.utc)
-        return now < (self._expires_at - timedelta(seconds=60))
+        return now < (expires_at - timedelta(seconds=60))
 
-    def _exchange_token(self) -> str:
+    def _exchange_token(self, token_type: str) -> str:
         """
-        Exchanges J1 Token for J2 Token.
+        Exchanges J1 Token for J2 Token for the specified type.
         """
-        if not settings.token_url or not settings.j1_token:
-            raise ValueError("TOKEN_URL and J1_TOKEN must be set when TOKEN_ENABLED is True")
+        if not settings.token_url:
+             raise ValueError("TOKEN_URL must be set when TOKEN_ENABLED is True")
+
+        j1_token = None
+        if token_type == "llm":
+            j1_token = settings.llm_j1_token
+        elif token_type == "embedding":
+            j1_token = settings.embed_j1_token
+        
+        if not j1_token:
+            raise ValueError(f"{token_type.upper()}_J1_TOKEN must be set when TOKEN_ENABLED is True")
 
         try:
             with httpx.Client(timeout=10.0) as client:
                 response = client.post(
                     settings.token_url,
-                    json={"key": settings.j1_token},
+                    json={"key": j1_token},
                     headers={"Content-Type": "application/json"}
                 )
                 response.raise_for_status()
                 data = response.json()
                 
-                self._token = data.get("token")
+                self._tokens[token_type] = data.get("token")
                 expires_at_str = data.get("expiresAt")
                 
                 if expires_at_str:
                     # Handle typical ISO formats. 
-                    # If Z is present, replace with +00:00 for fromisoformat compatibility in older python versions if needed, 
-                    # but usually ok in 3.11+. Safe bet:
                     if expires_at_str.endswith('Z'):
                         expires_at_str = expires_at_str[:-1] + '+00:00'
-                    self._expires_at = datetime.fromisoformat(expires_at_str)
+                    self._expires_at[token_type] = datetime.fromisoformat(expires_at_str)
                 else:
-                    # If no expiration, maybe set a default or don't cache forever?
-                    # For safety, defaults to 1 hour if parsing fails? 
-                    # But better to error if protocol expects it.
-                    # Let's assume it's there as per requirement.
                     pass
 
-                return self._token
+                return self._tokens[token_type]
                 
         except Exception as e:
             # Log error or re-raise
             # In a real app we might want logging.
-            print(f"[TokenManager] Exchange failed: {e}")
+            print(f"[TokenManager] Exchange failed for {token_type}: {e}")
             raise e
 
 token_manager = TokenManager()

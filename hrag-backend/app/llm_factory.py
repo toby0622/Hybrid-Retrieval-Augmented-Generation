@@ -13,7 +13,7 @@ def get_llm():
     default_headers = {"Content-Type": "application/json"}
     
     if settings.token_enabled:
-        token = token_manager.get_token()
+        token = token_manager.get_token(token_type="llm")
         if token:
             default_headers["Authorization"] = token
 
@@ -31,7 +31,7 @@ async def get_embedding(text: str) -> List[float]:
     async with httpx.AsyncClient(timeout=60.0) as client:
         headers = {"Authorization": f"Bearer {settings.embedding_api_key}"}
         if settings.token_enabled:
-            token = token_manager.get_token()
+            token = token_manager.get_token(token_type="embedding")
             if token:
                 headers["Authorization"] = token
 
