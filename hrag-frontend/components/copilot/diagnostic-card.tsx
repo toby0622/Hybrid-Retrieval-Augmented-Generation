@@ -112,7 +112,7 @@ export function DiagnosticCard({ diagnostic, onAction }: DiagnosticCardProps) {
   };
 
   return (
-    <div className="bg-slate-900/30 rounded-xl border border-slate-700/50 p-1 mt-2 max-w-5xl overflow-hidden animate-in fade-in duration-500 hover:border-slate-600/50 transition-colors">
+    <div className="bg-slate-900/30 rounded-xl border border-slate-700/50 p-1 mt-2 w-[80%] overflow-hidden animate-in fade-in duration-500 hover:border-slate-600/50 transition-colors">
       
       <div className="flex items-center gap-2 px-4 py-3 border-b border-slate-800/50 bg-slate-900/20">
         <div className="p-1 rounded bg-indigo-500/10">
