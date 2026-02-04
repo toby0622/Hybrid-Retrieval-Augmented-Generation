@@ -28,7 +28,7 @@ export function ChatInterface({ addToast }: ChatInterfaceProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [threadId, setThreadId] = useState<string | null>(null);
   const [isConnected, setIsConnected] = useState<boolean | null>(null);
-  const [healthInfo, setHealthInfo] = useState<{neo4j: string, qdrant: string, llm: string} | null>(null);
+  const [healthInfo, setHealthInfo] = useState<{neo4j: string, qdrant: string} | null>(null);
   const [modelName, setModelName] = useState<string>('Loading...');
   
   const [streamingSteps, setStreamingSteps] = useState<ReasoningStep[]>([]);
@@ -46,12 +46,12 @@ export function ChatInterface({ addToast }: ChatInterfaceProps) {
         const health = await apiClient.health();
         const isHealthy = health.status === 'healthy' || health.status === 'degraded';
         setIsConnected(isHealthy);
-        setHealthInfo({ neo4j: health.neo4j, qdrant: health.qdrant, llm: health.llm });
+        setHealthInfo({ neo4j: health.neo4j, qdrant: health.qdrant });
         setModelName(health.model_name || 'Unknown');
         setMessages([{
           id: 1,
           role: 'system',
-          content: `DevOps Copilot Online. Neo4j: ${health.neo4j} | Qdrant: ${health.qdrant} | LLM: ${health.llm}`,
+          content: `DevOps Copilot Online. Neo4j: ${health.neo4j} | Qdrant: ${health.qdrant}`,
           timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
         }]);
       } catch (error) {

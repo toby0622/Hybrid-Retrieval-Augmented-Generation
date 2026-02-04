@@ -80,7 +80,6 @@ class HealthResponse(BaseModel):
     status: str
     neo4j: str
     qdrant: str
-    llm: str
     model_name: str
 
 
@@ -185,46 +184,9 @@ async def health_check():
             logger.error(f"Qdrant health check failed: {e}")
             return f"error: {str(e)[:50]}"
 
-    def check_llm_sync():
-        try:
-            import httpx
-            # httpx is async capable, but keeping it sync here for uniformity with the thread pool pattern 
-            # or we could use async httpx directly. Let's use async httpx properly if possible, 
-            # but to ensure we don't block, let's just use the sync wrapper or proper async.
-            # actually httpx is already async in the original code? 
-            # Original: async with httpx.AsyncClient... 
-            # So we can keep LLM check async natural.
-            raise NotImplementedError("Use async implementation") 
-        except Exception as e:
-             raise e
-
     # Execute checks
     neo4j_status = await check_service(check_neo4j_sync)
     qdrant_status = await check_service(check_qdrant_sync)
-
-    # LLM Check (Native Async)
-    llm_status = "disconnected"
-    try:
-        import httpx
-        from app.services.auth import token_manager
-
-        headers = {}
-        if settings.token_enabled:
-            loop = asyncio.get_running_loop()
-            token = await loop.run_in_executor(None, token_manager.get_token)
-            if token:
-                headers["Authorization"] = token
-
-        async with httpx.AsyncClient(timeout=2.0) as client:
-            response = await client.get(f"{settings.llm_base_url}/models", headers=headers)
-            if response.status_code == 200:
-                llm_status = "connected"
-            else:
-                llm_status = f"error: {response.status_code}"
-                logger.warning(f"LLM health check failed with status: {response.status_code}")
-    except Exception as e:
-        llm_status = f"error: {str(e)[:30]}"
-        logger.error(f"LLM health check exception: {e}")
 
     overall_status = (
         "healthy"
@@ -233,7 +195,7 @@ async def health_check():
     )
 
     return HealthResponse(
-        status=overall_status, neo4j=neo4j_status, qdrant=qdrant_status, llm=llm_status, model_name=settings.llm_model_name
+        status=overall_status, neo4j=neo4j_status, qdrant=qdrant_status, model_name=settings.llm_model_name
     )
 
 
