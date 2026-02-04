@@ -27,11 +27,12 @@ export default function Home() {
           }} 
         />
         
-        {activeTab === 'copilot' ? (
+        <div className={activeTab === 'copilot' ? "h-full" : "hidden"}>
           <ChatInterface addToast={addToast} />
-        ) : (
+        </div>
+        <div className={activeTab === 'knowledge' ? "h-full" : "hidden"}>
           <KnowledgeInterface addToast={addToast} />
-        )}
+        </div>
       </main>
     </div>
   );
