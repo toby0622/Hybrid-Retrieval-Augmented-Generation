@@ -49,6 +49,7 @@ Open [http://localhost:3000](http://localhost:3000) with your browser to see the
 - `components/`: Reusable React components.
     - `copilot/`: Chat-related components (`chat-interface`, `diagnostic-card`, `dynamic-reasoning`).
     - `knowledge/`: Knowledge base components (`knowledge-interface`, `entity-card`, `upload-zone`).
+    - `layout/`: Layout components.
     - `ui/`: Generic UI components (shadcn/ui style).
 - `lib/`: Utilities and API client (`api.ts`).
 - `hooks/`: Custom React hooks.

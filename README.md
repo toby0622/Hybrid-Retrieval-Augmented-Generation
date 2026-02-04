@@ -16,18 +16,23 @@ This project implements a "Human-in-the-Loop" architecture for incident manageme
 ```
 ├── hrag-backend/              # FastAPI backend
 │   ├── app/
+│   │   ├── api/               # API Router Endpoints
+│   │   ├── core/              # Core Config & Logging
 │   │   ├── nodes/             # LangGraph Nodes
 │   │   │   ├── input_guard.py # Safety & Validation
 │   │   │   ├── slot_filling.py# Entity Extraction
 │   │   │   ├── retrieval.py   # Hybrid Retrieval (Neo4j + Qdrant)
 │   │   │   ├── reasoning.py   # Chain-of-Thought Logic
+│   │   │   ├── mcp_tools.py   # MCP Tool Definitions
 │   │   │   ├── response.py    # Final Answer Generation
 │   │   │   └── feedback.py    # Human-in-the-Loop Handling
-│   │   ├── api/               # API Router Endpoints
+│   │   ├── schemas/           # Pydantic Models (Chat, Documents)
+│   │   ├── services/          # Business Logic
+│   │   │   ├── ingestion.py   # Data Ingestion Service
+│   │   │   ├── mcp.py         # MCP Client Service
+│   │   │   └── auth.py        # Authentication Service
 │   │   ├── graph.py           # Main LangGraph Workflow
 │   │   ├── state.py           # State Definition
-│   │   ├── ingestion.py       # Data Ingestion Logic
-│   │   ├── mcp_client.py      # MCP Database Client (Real-time Data)
 │   │   ├── schema_registry.py # Dynamic Domain Schema Registry
 │   │   └── domain_config.py   # Domain Specific Config Loader
 │   ├── config/                # YAML Configuration Files
@@ -39,6 +44,7 @@ This project implements a "Human-in-the-Loop" architecture for incident manageme
 │   ├── components/            # React Components
 │   │   ├── copilot/           # Chat Interface & Reasoning UI
 │   │   ├── knowledge/         # Knowledge Base Management
+│   │   ├── layout/            # Layout Components
 │   │   └── ui/                # Shared UI Components
 │   ├── lib/                   # Utilities & API Clients
 │   ├── hooks/                 # Custom React Hooks
