@@ -23,7 +23,7 @@ This project implements a "Human-in-the-Loop" architecture for incident manageme
 │   │   │   ├── reasoning.py   # Chain-of-Thought Logic
 │   │   │   ├── response.py    # Final Answer Generation
 │   │   │   └── feedback.py    # Human-in-the-Loop Handling
-│   │   ├── api.py             # API Endpoints
+│   │   ├── api/               # API Router Endpoints
 │   │   ├── graph.py           # Main LangGraph Workflow
 │   │   ├── state.py           # State Definition
 │   │   ├── ingestion.py       # Data Ingestion Logic

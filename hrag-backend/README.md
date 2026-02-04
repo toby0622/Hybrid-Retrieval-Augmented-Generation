@@ -74,6 +74,9 @@ python scripts/seed_neo4j_devops.py
 
 # Seed Vector Data (Qdrant)
 python scripts/seed_qdrant_devops.py
+
+# Seed MCP Data (PostgreSQL/SQLAlchemy)
+python scripts/seed_mcp_data.py
 ```
 
 ## 🚀 Running the Server
@@ -86,3 +89,12 @@ python main.py
 
 The API will be available at `http://localhost:8000`.
 API Documentation (Swagger UI) is available at `http://localhost:8000/docs`.
+
+## 🔌 API Endpoints
+
+The backend exposes the following main routers (see `app/api/routers`):
+
+- **`/chat`**: Main interaction endpoint for the chatbot.
+- **`/documents`**: Endpoints for uploading, listing, and deleting knowledge base documents.
+- **`/health`**: System health checks for database connections (Neo4j, Qdrant).
+

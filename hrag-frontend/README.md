@@ -51,4 +51,5 @@ Open [http://localhost:3000](http://localhost:3000) with your browser to see the
     - `knowledge/`: Knowledge base components (`knowledge-interface`, `entity-card`, `upload-zone`).
     - `ui/`: Generic UI components (shadcn/ui style).
 - `lib/`: Utilities and API client (`api.ts`).
+- `hooks/`: Custom React hooks.
 - `types/`: TypeScript interfaces.
