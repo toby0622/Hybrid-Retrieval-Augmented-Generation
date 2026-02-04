@@ -35,11 +35,29 @@ async def get_embedding(text: str) -> List[float]:
             if token:
                 headers["Authorization"] = token
 
-        response = await client.post(
-            f"{settings.embedding_base_url}/embeddings",
-            json={"model": settings.embedding_model_name, "input": text},
-            headers=headers,
-        )
-        response.raise_for_status()
-        data = response.json()
-        return data["data"][0]["embedding"]
+        if settings.token_enabled:
+            payload = {
+                "text": text,
+                "model": settings.embedding_model_name,
+                "encoding-format": "float"
+            }
+            response = await client.post(
+                f"{settings.embedding_base_url}",
+                json=payload,
+                headers=headers,
+            )
+            response.raise_for_status()
+            data = response.json()
+            return data["returnData"][0]["embeddings"]
+        else:
+            payload = {
+                "input": text,
+                "model": settings.embedding_model_name,
+            }
+            response = await client.post(
+                f"{settings.embedding_base_url}/embeddings",
+                json=payload,
+            )
+            response.raise_for_status()
+            data = response.json()
+            return data["data"][0]["embedding"]
