@@ -13,7 +13,6 @@ from app.domain_init import (
 )
 from app.llm_factory import get_embedding, get_llm
 from app.schema_registry import SchemaRegistry
-from app.services.auth import token_manager
 from langchain_core.prompts import ChatPromptTemplate
 from neo4j import AsyncGraphDatabase
 from qdrant_client import QdrantClient

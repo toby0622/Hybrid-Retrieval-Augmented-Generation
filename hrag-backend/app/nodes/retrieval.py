@@ -6,7 +6,6 @@ from app.core.config import settings
 from app.domain_init import get_active_domain
 from app.llm_factory import get_embedding, get_llm
 from app.schema_registry import SchemaRegistry
-from app.services.auth import token_manager
 from app.state import DynamicSlotInfo, GraphState, RetrievalResult, SlotInfo
 from langchain_core.prompts import ChatPromptTemplate
 from neo4j import AsyncGraphDatabase

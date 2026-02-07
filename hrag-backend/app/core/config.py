@@ -13,10 +13,6 @@ class Settings(BaseSettings):
     embedding_api_key: str = ""
     embedding_model_name: str = ""
 
-    token_url: Optional[str] = None
-    llm_j1_token: Optional[str] = None
-    embed_j1_token: Optional[str] = None
-    token_enabled: bool = False
 
     neo4j_uri: str = ""
     neo4j_user: str = ""
