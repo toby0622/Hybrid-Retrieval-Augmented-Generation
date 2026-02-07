@@ -83,7 +83,7 @@ class SlotInfo(BaseModel):
 
 
 class RetrievalResult(BaseModel):
-    source: Literal["graph", "vector", "mcp_tool"]
+    source: Literal["graph", "vector", "skill"]
     title: str
     content: str
     metadata: Dict[str, Any] = Field(default_factory=dict)
@@ -135,7 +135,7 @@ class GraphState(TypedDict, total=False):
 
     graph_results: List[RetrievalResult]
     vector_results: List[RetrievalResult]
-    mcp_results: List[RetrievalResult]
+    skill_results: List[RetrievalResult]
     aggregated_context: str
 
     reasoning_steps: List[str]

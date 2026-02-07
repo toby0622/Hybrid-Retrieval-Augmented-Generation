@@ -28,13 +28,6 @@ class Settings(BaseSettings):
 
     active_domain: Optional[str] = None
 
-    mcp_db_host: str = ""
-    mcp_db_port: int = 5432
-    mcp_db_name: str = ""
-    mcp_db_user: str = ""
-    mcp_db_password: str = ""
-    mcp_enabled: bool = False
-
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"

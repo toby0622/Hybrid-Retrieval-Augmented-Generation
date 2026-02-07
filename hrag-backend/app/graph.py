@@ -1,6 +1,5 @@
 from app.nodes.feedback import feedback_node, route_after_feedback
 from app.nodes.input_guard import input_guard_node, route_after_guard
-from app.nodes.mcp_tools import mcp_tool_node
 from app.nodes.reasoning import reasoning_node
 from app.nodes.response import (
     chat_response_node,
@@ -22,7 +21,6 @@ def create_hrag_graph() -> StateGraph:
     workflow.add_node("slot_check", slot_check_node)
     workflow.add_node("ask_clarification", clarification_response_node)
     workflow.add_node("retrieval", hybrid_retrieval_node)
-    workflow.add_node("mcp_tool", mcp_tool_node)
     workflow.add_node("reasoning", reasoning_node)
     workflow.add_node("chat_response", chat_response_node)
     workflow.add_node("diagnostic_response", diagnostic_response_node)
@@ -51,8 +49,7 @@ def create_hrag_graph() -> StateGraph:
 
     workflow.add_edge("ask_clarification", END)
 
-    workflow.add_edge("retrieval", "mcp_tool")
-    workflow.add_edge("mcp_tool", "reasoning")
+    workflow.add_edge("retrieval", "reasoning")
     workflow.add_edge("reasoning", "diagnostic_response")
 
     workflow.add_edge("diagnostic_response", END)

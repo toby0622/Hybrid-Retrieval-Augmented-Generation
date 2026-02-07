@@ -302,15 +302,32 @@ async def vector_search_node(state: GraphState) -> GraphState:
     return {**state, "vector_results": results}
 
 
+from app.services.skill_loader import SkillLoader
+
+async def skill_search_node(state: GraphState) -> GraphState:
+    query = state.get("query", "")
+    slots = state.get("slots")
+    if isinstance(slots, SlotInfo):
+        slots = slots.to_dynamic()
+    elif slots is None:
+        slots = DynamicSlotInfo()
+    
+    results = await SkillLoader.execute_relevant_skills(query, slots)
+    return {**state, "skill_results": results}
+
+
 async def hybrid_retrieval_node(state: GraphState) -> GraphState:
     graph_task = asyncio.create_task(graph_search_node(state))
     vector_task = asyncio.create_task(vector_search_node(state))
+    skill_task = asyncio.create_task(skill_search_node(state))
 
     graph_state = await graph_task
     vector_state = await vector_task
+    skill_state = await skill_task
 
     return {
         **state,
         "graph_results": graph_state.get("graph_results", []),
         "vector_results": vector_state.get("vector_results", []),
+        "skill_results": skill_state.get("skill_results", []),
     }

@@ -39,9 +39,9 @@ Respond in {domain_config.response_language}.
     {{vector_context}}
   </vector_search_results>
   
-  <realtime_metrics>
-    {{mcp_context}}
-  </realtime_metrics>
+  <skill_results>
+    {{skill_context}}
+  </skill_results>
 </evidence_sources>
 
 <!-- 4. Detailed Task Description & Rules -->
@@ -113,7 +113,7 @@ async def reasoning_node(state: GraphState) -> GraphState:
 
     graph_results = state.get("graph_results", [])
     vector_results = state.get("vector_results", [])
-    mcp_results = state.get("mcp_results", [])
+    skill_results = state.get("skill_results", [])
 
     current_domain = get_active_domain()
     if not current_domain:
@@ -123,13 +123,14 @@ async def reasoning_node(state: GraphState) -> GraphState:
 
     graph_context = _format_results(graph_results) or "No graph results available."
     vector_context = _format_results(vector_results) or "No document matches found."
-    mcp_context = _format_results(mcp_results) or "No real-time data available."
+    skill_context = _format_results(skill_results) or "No skill results available."
 
     reasoning_steps = [
         f"Input Guardrails: Intent '{state.get('intent', 'unknown')}' detected",
         f"Slot Extraction: {len(slots.get_filled_slots())} slots identified",
         f"Graph Search: {len(graph_results)} results",
         f"Vector Search: {len(vector_results)} matches",
+        f"Skill Execution: {len(skill_results)} results",
         "LLM Reasoning: Synthesizing analysis",
     ]
 
@@ -144,26 +145,27 @@ async def reasoning_node(state: GraphState) -> GraphState:
                 "slots_info": slots_info,
                 "graph_context": graph_context,
                 "vector_context": vector_context,
-                "mcp_context": mcp_context,
+                "skill_context": skill_context,
             }
         )
         llm_analysis = "<analysis>\n  <thinking>" + result.content
     except Exception as e:
         llm_analysis = f"Analysis error: {e}"
 
+
     diagnostic = _parse_diagnostic_response(
         llm_analysis,
         query,
         graph_results=graph_results,
         vector_results=vector_results,
-        mcp_results=mcp_results,
+        skill_results=skill_results,
     )
 
     return {
         **state,
         "reasoning_steps": reasoning_steps,
         "diagnostic": diagnostic,
-        "aggregated_context": f"{graph_context}\n\n{vector_context}\n\n{mcp_context}",
+        "aggregated_context": f"{graph_context}\n\n{vector_context}\n\n{skill_context}",
     }
 
 
@@ -185,12 +187,12 @@ def _parse_diagnostic_response(
     query: str,
     graph_results: List[dict] = None,
     vector_results: List[dict] = None,
-    mcp_results: List[dict] = None,
+    skill_results: List[dict] = None,
 ) -> DiagnosticResponse:
     steps = []
     graph_results = graph_results or []
     vector_results = vector_results or []
-    mcp_results = mcp_results or []
+    skill_results = skill_results or []
 
     if graph_results:
         first_result = graph_results[0]
@@ -261,30 +263,21 @@ def _parse_diagnostic_response(
             )
         )
 
-    if mcp_results:
-        first_result = mcp_results[0]
-        sql_query = first_result.get("metadata", {}).get(
-            "sql_query", "SQL info not available"
-        )
-
+    if skill_results:
+        # Assuming skill results have some metadata or raw data
+        
         table_data = []
-        for r in mcp_results:
-            if r.get("raw_data"):
-                data = r.get("raw_data").copy()
-                if "sql_query" in data:
-                    del data["sql_query"]
-                table_data.append(data)
-            else:
-                table_data.append(
-                    {"title": r.get("title"), "content": r.get("content")}
-                )
+        for r in skill_results:
+             table_data.append(
+                {"title": r.get("title"), "content": r.get("content")}
+            )
 
         steps.append(
             DiagnosticStep(
-                id="mcp",
-                source="MCP Tool",
-                title=f"SQL Retrieval ({len(mcp_results)} results)",
-                detail=f"Executed SQL Command:\n{sql_query}",
+                id="skill",
+                source="Skill Tool",
+                title=f"Skill Execution ({len(skill_results)} results)",
+                detail=f"Executed Skills provided data.",
                 status="info",
                 is_parallel=True,
                 raw_content={
@@ -296,10 +289,10 @@ def _parse_diagnostic_response(
     else:
         steps.append(
             DiagnosticStep(
-                id="mcp",
-                source="MCP Tool",
-                title="SQL Retrieval (0 results)",
-                detail="No real-time data retrieved via SQL.",
+                id="skill",
+                source="Skill Tool",
+                title="Skill Execution (0 results)",
+                detail="No skill data retrieved.",
                 status="warning",
                 is_parallel=True,
             )
