@@ -190,11 +190,13 @@ class SkillRegistry:
     def initialize(
         cls,
         skills_path: Optional[Path] = None,
-        active_skill: Optional[str] = None,
     ) -> SkillConfig:
         """
-        Full initialization: discover skills and set active.
-        Replaces the old `initialize_domain_system()`.
+        Discover all skills and prepare auto-routing.
+
+        The system always uses LLM-based auto-routing: input_guard picks
+        the best skill per query. The first discovered skill is set as
+        fallback for startup readiness.
         """
         base_path = Path(__file__).parent.parent
 
@@ -202,10 +204,7 @@ class SkillRegistry:
             skills_dir = getattr(settings, "skills_dir", "skills")
             skills_path = base_path / skills_dir
 
-        if active_skill is None:
-            active_skill = getattr(settings, "active_skill", None)
-
-        logger.info("Initializing skill system...")
+        logger.info("Initializing skill system (auto-routing)...")
         logger.info(f"   Skills path: {skills_path}")
 
         discovered = cls.discover(skills_path)
@@ -214,26 +213,14 @@ class SkillRegistry:
         if not discovered:
             raise ValueError(f"No skills found in {skills_path}")
 
-        # Auto-select active skill
-        if not active_skill:
-            active_skill = discovered[0]
-            logger.info(f"   No active skill configured, defaulting to '{active_skill}'")
-
-        if active_skill not in cls._skills:
-            logger.warning(f"   Skill '{active_skill}' not found, using first available")
-            active_skill = discovered[0]
-
-        success = cls.set_active(active_skill)
-        if not success:
-            raise ValueError(f"Failed to set active skill: {active_skill}")
+        # Set first skill as fallback (LLM will override per query)
+        cls._active_skill = discovered[0]
 
         config = cls.get_active()
         if config is None:
             raise ValueError("No active skill configuration")
 
-        logger.info(f"   Active skill: {config.display_name}")
-        logger.info(f"   Intents: {config.intents}")
-        logger.info(f"   Required slots: {config.slots.required}")
+        logger.info(f"   Fallback skill: {config.display_name}")
         logger.info(f"   Handlers loaded: {cls.list_handlers()}")
 
         return config

@@ -1,5 +1,3 @@
-from typing import Optional
-
 from pydantic_settings import BaseSettings
 
 
@@ -27,7 +25,6 @@ class Settings(BaseSettings):
     api_port: int = 8000
     debug: bool = False
 
-    active_skill: Optional[str] = None
     skills_dir: str = "skills"
 
     mcp_db_host: str = ""
