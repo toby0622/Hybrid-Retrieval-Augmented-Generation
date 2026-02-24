@@ -1,14 +1,15 @@
 from app.core.config import settings
-from app.domain_init import get_active_domain
+from app.core.logger import logger
 from app.llm_factory import get_llm
+from app.skill_registry import get_active_skill
 from app.state import DynamicSlotInfo, GraphState, SlotInfo
 from langchain_core.prompts import ChatPromptTemplate
 
 
-def _get_clarification_prompt(domain_config) -> ChatPromptTemplate:
+def _get_clarification_prompt(skill_config) -> ChatPromptTemplate:
     examples_xml = "<examples>\n"
-    if domain_config.clarification_prompt.examples:
-        for ex in domain_config.clarification_prompt.examples:
+    if skill_config.clarification_prompt.examples:
+        for ex in skill_config.clarification_prompt.examples:
             if isinstance(ex, dict):
                 known = ex.get("known", "")
                 missing = ex.get("missing", "")
@@ -18,29 +19,29 @@ def _get_clarification_prompt(domain_config) -> ChatPromptTemplate:
                 examples_xml += f"    <missing>{missing}</missing>\n"
                 examples_xml += f"    <question>{question}</question>\n"
                 examples_xml += "  </example>\n"
-    elif domain_config.slots.required:
+    elif skill_config.slots.required:
         examples_xml += "  <example>\n"
         examples_xml += "    <known>Partial info provided</known>\n"
-        examples_xml += f"    <missing>{domain_config.slots.required[0]}</missing>\n"
-        examples_xml += f"    <question>Could you provide the {domain_config.slots.required[0]}?</question>\n"
+        examples_xml += f"    <missing>{skill_config.slots.required[0]}</missing>\n"
+        examples_xml += f"    <question>Could you provide the {skill_config.slots.required[0]}?</question>\n"
         examples_xml += "  </example>\n"
     examples_xml += "</examples>"
 
     priority_list = ""
-    for i, slot in enumerate(domain_config.slots.required, 1):
+    for i, slot in enumerate(skill_config.slots.required, 1):
         priority_list += f"{i}. {slot} (REQUIRED)\n"
     for i, slot in enumerate(
-        domain_config.slots.optional, len(domain_config.slots.required) + 1
+        skill_config.slots.optional, len(skill_config.slots.required) + 1
     ):
         priority_list += f"{i}. {slot} (OPTIONAL)\n"
 
     system_prompt = f"""<!-- 1. Task Context -->
-{domain_config.clarification_prompt.system_identity or "You are ClarificationAgent."}
+{skill_config.clarification_prompt.system_identity or "You are ClarificationAgent."}
 Your responsibility is to generate clear, targeted questions to gather missing information.
 
 <!-- 2. Tone Context -->
 Be professional, concise, and helpful. Guide the user toward providing specific details.
-Use {domain_config.response_language} for responses.
+Use {skill_config.response_language} for responses.
 
 <!-- 3. Background Data -->
 <current_context>
@@ -66,7 +67,7 @@ RULES:
 {examples_xml}
 
 <!-- 9. Output Formatting -->
-Output: A single clarification question in {domain_config.response_language}.
+Output: A single clarification question in {skill_config.response_language}.
 Do not include any prefixes, labels, or explanations - just the question itself."""
 
     return ChatPromptTemplate.from_messages(
@@ -93,12 +94,12 @@ async def slot_check_node(state: GraphState) -> GraphState:
     query = state.get("query", "")
     clarification_count = state.get("clarification_count", 0)
 
-    current_domain = get_active_domain()
-    if not current_domain:
+    current_skill = get_active_skill()
+    if not current_skill:
         return {**state, "clarification_question": None}
 
     slots.configure(
-        required=current_domain.slots.required, optional=current_domain.slots.optional
+        required=current_skill.slots.required, optional=current_skill.slots.optional
     )
 
     if slots.is_sufficient() or clarification_count >= MAX_CLARIFICATION_ROUNDS:
@@ -115,7 +116,7 @@ async def slot_check_node(state: GraphState) -> GraphState:
         known_info = "No specific details provided yet."
 
     llm = get_llm()
-    prompt = _get_clarification_prompt(current_domain)
+    prompt = _get_clarification_prompt(current_skill)
     chain = prompt | llm
 
     try:
@@ -128,7 +129,7 @@ async def slot_check_node(state: GraphState) -> GraphState:
         )
         clarification = result.content.strip()
     except Exception as e:
-        print(f"[SlotFilling] generation error: {e}")
+        logger.warning(f"[SlotFilling] generation error: {e}")
         clarification = f"Could you please provide more details regarding {missing[0]}?"
 
     return {

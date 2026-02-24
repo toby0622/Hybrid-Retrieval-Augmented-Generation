@@ -118,7 +118,7 @@ class GraphState(TypedDict, total=False):
     query: str
     messages: List[Message]
 
-    domain: str
+    skill: str
 
     intent: str
 

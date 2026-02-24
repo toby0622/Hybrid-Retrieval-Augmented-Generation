@@ -1,0 +1,22 @@
+name: hello
+display_name: "Hello Greeter"
+version: "1.0.0"
+description: "A simple greeting skill that responds to hello/hi messages"
+response_language: "en"
+
+routing_keywords:
+  - hello
+  - hi
+  - greet
+
+intents:
+  - chat
+  - end
+
+slots:
+  required: []
+  optional: []
+
+prompts:
+  chat:
+    system_identity: "You are a friendly greeter."

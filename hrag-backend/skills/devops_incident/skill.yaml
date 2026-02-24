@@ -1,0 +1,202 @@
+name: devops_incident
+display_name: "DevOps Incident Response"
+version: "1.0.0"
+description: "DevOps 事件偵測與回應系統，支援故障排查、根因分析與知識庫查詢"
+response_language: "zh-TW"
+
+# ─────────────────── Routing ───────────────────
+routing_keywords:
+  - devops
+  - incident
+  - 事件
+  - 故障
+  - error
+  - crash
+  - "502"
+  - "503"
+  - "500"
+  - timeout
+  - 超時
+  - 斷線
+  - 當機
+  - deploy
+  - 部署
+  - service
+  - server
+  - 伺服器
+  - pod
+  - container
+  - kubernetes
+  - k8s
+
+# ─────────────────── Intent Classification ───────────────────
+intents:
+  - question
+  - troubleshoot
+  - status
+  - chat
+  - end
+
+intent_keywords:
+  question:
+    - what
+    - how
+    - why
+    - explain
+    - 什麼
+    - 如何
+    - 為什麼
+    - 說明
+  troubleshoot:
+    - fix
+    - debug
+    - solve
+    - resolve
+    - investigate
+    - 修復
+    - 排查
+    - 解決
+    - 調查
+    - diagnose
+  status:
+    - status
+    - health
+    - check
+    - 狀態
+    - 檢查
+    - monitor
+
+# ─────────────────── Slot Filling ───────────────────
+slots:
+  required:
+    - service_name
+  optional:
+    - error_type
+    - time_range
+    - severity
+    - environment
+  examples:
+    service_name:
+      - "api-gateway"
+      - "auth-service"
+      - "payment-module"
+      - "user-database"
+      - "order-service"
+    error_type:
+      - "502 Bad Gateway"
+      - "Connection Timeout"
+      - "OOM Killed"
+      - "CrashLoopBackOff"
+      - "High Latency"
+    severity:
+      - "critical"
+      - "high"
+      - "medium"
+      - "low"
+
+# ─────────────────── Prompts ───────────────────
+prompts:
+  classification:
+    system_identity: |
+      You are an Intent Classifier for a DevOps Incident Response system.
+      Your job is to categorize user inputs into defined intents:
+      question, troubleshoot, status, chat, or end.
+    capabilities:
+      - Classify user intent based on keywords and context
+      - Distinguish between informational queries and troubleshooting requests
+
+  clarification:
+    system_identity: |
+      You are a helpful DevOps assistant gathering incident details.
+      Your goal is to collect necessary information such as the affected service,
+      error type, time range, and severity level.
+    examples:
+      - known: "User reports 502 errors"
+        missing: "service_name"
+        question: "請問是哪個服務出現 502 錯誤？例如 api-gateway 或 auth-service。"
+      - known: "User mentions api-gateway issues"
+        missing: "error_type"
+        question: "api-gateway 出現了什麼類型的錯誤？例如 Connection Timeout 或 502 Bad Gateway。"
+
+  reasoning:
+    system_identity: |
+      You are a Senior DevOps Engineer and Expert Analyst.
+      Your job is to analyze incident data from multiple sources (knowledge graph,
+      vector search, and skill outputs) and provide root cause analysis with
+      actionable recommendations.
+    capabilities:
+      - Root cause analysis based on topology and logs
+      - Cross-service correlation
+      - Impact assessment
+      - Remediation recommendations
+
+  chat:
+    system_identity: |
+      You are DevOps Copilot, a friendly and professional assistant specialized
+      in DevOps operations, infrastructure monitoring, and incident management.
+    capabilities:
+      - Answer questions about DevOps best practices
+      - Explain system architecture and dependencies
+      - Guide users through troubleshooting workflows
+
+# ─────────────────── Graph Queries (Neo4j) ───────────────────
+graph_queries:
+  primary_search: |
+    MATCH (n:Entity)
+    WHERE toLower(n.name) CONTAINS toLower($hint)
+    RETURN n.name as name, n.description as description,
+           labels(n) as labels
+    LIMIT 5
+
+  context_search: |
+    MATCH (n:Entity)-[r]->(m:Entity)
+    WHERE toLower(n.name) CONTAINS toLower($hint)
+    RETURN n.name as source, type(r) as relation, m.name as target,
+           n.description as source_desc, m.description as target_desc
+    LIMIT 10
+
+  fallback_search: |
+    MATCH (n:Entity)
+    RETURN n.name as name
+    LIMIT 5
+
+# ─────────────────── Vector Search (Qdrant) ───────────────────
+vector_filter_fields:
+  - service_name
+  - error_type
+  - severity
+
+# ─────────────────── Knowledge Graph Schema ───────────────────
+schema:
+  entities:
+    - name: Service
+      description: "A microservice, API, or system component"
+      properties: [name, status, version, team, description]
+      extraction_hints: "Look for service names, API names, module names"
+    - name: Incident
+      description: "An incident or outage event"
+      properties: [title, severity, timestamp, status, duration]
+      extraction_hints: "Look for error events, outages, failures"
+    - name: Infrastructure
+      description: "Infrastructure components like servers, pods, containers"
+      properties: [name, type, region, status]
+    - name: ErrorPattern
+      description: "Known error patterns and their signatures"
+      properties: [pattern, frequency, first_seen, last_seen]
+  relations:
+    - name: AFFECTS
+      source: Incident
+      target: Service
+      description: "An incident affects a service"
+    - name: DEPENDS_ON
+      source: Service
+      target: Service
+      description: "Service dependency relationship"
+    - name: RUNS_ON
+      source: Service
+      target: Infrastructure
+      description: "A service runs on infrastructure"
+    - name: TRIGGERS
+      source: ErrorPattern
+      target: Incident
+      description: "An error pattern triggers an incident"

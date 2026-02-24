@@ -2,8 +2,9 @@ import re
 from typing import List
 
 from app.core.config import settings
-from app.domain_init import get_active_domain
+from app.core.logger import logger
 from app.llm_factory import get_llm
+from app.skill_registry import get_active_skill
 from app.state import (
     DiagnosticResponse,
     DiagnosticStep,
@@ -15,14 +16,14 @@ from app.state import (
 from langchain_core.prompts import ChatPromptTemplate
 
 
-def _get_reasoning_prompt(domain_config) -> ChatPromptTemplate:
+def _get_reasoning_prompt(skill_config) -> ChatPromptTemplate:
     system_prompt = f"""<!-- 1. Task Context -->
-{domain_config.reasoning_prompt.system_identity or "You are the Core Reasoning Engine."}
+{skill_config.reasoning_prompt.system_identity or "You are the Core Reasoning Engine."}
 Your responsibility is to synthesize information from multiple sources and provide accurate analysis.
 
 <!-- 2. Tone Context -->
 Be analytical, precise, and solution-oriented.
-Respond in {domain_config.response_language}.
+Respond in {skill_config.response_language}.
 
 <!-- 3. Background Data -->
 <incident_context>
@@ -115,9 +116,9 @@ async def reasoning_node(state: GraphState) -> GraphState:
     vector_results = state.get("vector_results", [])
     skill_results = state.get("skill_results", [])
 
-    current_domain = get_active_domain()
-    if not current_domain:
-        return {**state, "response": "System error: Domain not initialized."}
+    current_skill = get_active_skill()
+    if not current_skill:
+        return {**state, "response": "System error: No skill initialized."}
 
     slots_info = slots.to_display_string()
 
@@ -137,7 +138,7 @@ async def reasoning_node(state: GraphState) -> GraphState:
     llm_analysis = "Analysis failed."
     try:
         llm = get_llm()
-        prompt = _get_reasoning_prompt(current_domain)
+        prompt = _get_reasoning_prompt(current_skill)
         chain = prompt | llm
         result = await chain.ainvoke(
             {
@@ -150,6 +151,7 @@ async def reasoning_node(state: GraphState) -> GraphState:
         )
         llm_analysis = "<analysis>\n  <thinking>" + result.content
     except Exception as e:
+        logger.error(f"Reasoning analysis failed: {e}")
         llm_analysis = f"Analysis error: {e}"
 
 
@@ -264,8 +266,6 @@ def _parse_diagnostic_response(
         )
 
     if skill_results:
-        # Assuming skill results have some metadata or raw data
-        
         table_data = []
         for r in skill_results:
              table_data.append(

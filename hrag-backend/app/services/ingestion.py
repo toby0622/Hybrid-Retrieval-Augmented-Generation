@@ -5,14 +5,8 @@ from typing import Any, Dict, List, Optional
 import httpx
 from app.core.config import settings
 from app.core.logger import logger
-from app.domain_config import DomainRegistry
-from app.domain_init import (
-    get_active_domain,
-    list_available_domains,
-    switch_domain,
-)
 from app.llm_factory import get_embedding, get_llm
-from app.schema_registry import SchemaRegistry
+from app.skill_registry import SkillRegistry, get_active_skill, list_available_skills, switch_skill
 from langchain_core.prompts import ChatPromptTemplate
 from neo4j import AsyncGraphDatabase
 from qdrant_client import QdrantClient
@@ -30,7 +24,7 @@ class ExtractedEntity:
 @dataclass
 class IngestResult:
     success: bool
-    domain: str
+    skill: str
     entities_created: int
     relations_created: int
     vectors_created: int
@@ -38,6 +32,7 @@ class IngestResult:
 
 
 def _build_extraction_prompt(schema) -> ChatPromptTemplate:
+    """Build entity extraction prompt from a SkillSchemaConfig."""
     entity_types_xml = "<entity_types>\n"
     for entity in schema.entities:
         props = (
@@ -64,8 +59,10 @@ def _build_extraction_prompt(schema) -> ChatPromptTemplate:
     entity_names = " | ".join([e.name for e in schema.entities])
     relation_names = " | ".join([r.name for r in schema.relations])
 
+    display_name = getattr(schema, "display_name", "this skill")
+
     system_prompt = f"""<!-- 1. Task Context -->
-You are EntityExtractor for the {schema.display_name} domain.
+You are EntityExtractor for the {display_name} skill.
 Your task is to extract structured entities and relationships from documents.
 
 <!-- 2. Tone Context -->
@@ -155,7 +152,7 @@ async def extract_entities_with_schema(content: str, schema) -> List[ExtractedEn
         return entities
 
     except Exception as e:
-        logger.error(f"Extraction error for {schema.display_name}: {e}")
+        logger.error(f"Entity extraction error: {e}")
         return []
 
 
@@ -218,7 +215,7 @@ async def write_entities_to_neo4j(entities: List[ExtractedEntity]) -> tuple[int,
 
 
 async def write_document_to_qdrant(
-    content: str, filename: str, domain: str, doc_type: str = "document"
+    content: str, filename: str, skill: str, doc_type: str = "document"
 ) -> int:
     import uuid as uuid_mod
 
@@ -251,7 +248,7 @@ async def write_document_to_qdrant(
                     "title": filename,
                     "content": chunk,
                     "doc_type": doc_type,
-                    "domain": domain,
+                    "skill": skill,
                     "chunk_index": i,
                 },
             )
@@ -288,20 +285,21 @@ def _chunk_document(content: str, max_chunk_size: int = 1000) -> List[str]:
     return chunks if chunks else [content]
 
 
-async def detect_domain_from_content(content: str) -> str:
-    available_domains = list_available_domains()
+async def detect_skill_from_content(content: str) -> str:
+    """Detect the most appropriate skill for the given content."""
+    available_skills = list_available_skills()
 
-    if not available_domains:
+    if not available_skills:
         return "unknown"
 
-    if len(available_domains) == 1:
-        return available_domains[0]
+    if len(available_skills) == 1:
+        return available_skills[0]
 
-    from app.nodes.input_guard import _detect_domain_async
+    from app.nodes.input_guard import _detect_skill_async
 
-    detected = await _detect_domain_async(content[:1000])
+    detected = await _detect_skill_async(content[:1000])
 
-    return detected or available_domains[0]
+    return detected or available_skills[0]
 
 
 async def ingest_document(
@@ -309,15 +307,13 @@ async def ingest_document(
 ) -> IngestResult:
     errors = []
 
-    domain = await detect_domain_from_content(content)
-    logger.info(f"Detected domain: {domain}")
+    skill_name = await detect_skill_from_content(content)
+    logger.info(f"Detected skill: {skill_name}")
 
-    switch_domain(domain)
+    switch_skill(skill_name)
 
-    domain_config = DomainRegistry.get_domain(domain)
-    schema = None
-    if domain_config and domain_config.schema_name:
-        schema = SchemaRegistry.get_schema(domain_config.schema_name)
+    skill_config = SkillRegistry.get_skill(skill_name)
+    schema = skill_config.kg_schema if skill_config else None
 
     entities = []
     nodes_created = 0
@@ -334,13 +330,13 @@ async def ingest_document(
                 errors.append(f"Neo4j write error: {e}")
     else:
         logger.warning(
-            f"No schema found for domain {domain}, skipping entity extraction"
+            f"No schema found for skill {skill_name}, skipping entity extraction"
         )
 
     vectors_created = 0
     try:
         vectors_created = await write_document_to_qdrant(
-            content, filename, domain, doc_type
+            content, filename, skill_name, doc_type
         )
     except Exception as e:
         logger.error(f"Qdrant write error: {e}")
@@ -348,7 +344,7 @@ async def ingest_document(
 
     return IngestResult(
         success=len(errors) == 0,
-        domain=domain,
+        skill=skill_name,
         entities_created=nodes_created,
         relations_created=rels_created,
         vectors_created=vectors_created,

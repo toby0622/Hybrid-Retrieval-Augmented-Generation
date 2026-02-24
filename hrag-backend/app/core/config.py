@@ -27,7 +27,8 @@ class Settings(BaseSettings):
     api_port: int = 8000
     debug: bool = False
 
-    active_domain: Optional[str] = None
+    active_skill: Optional[str] = None
+    skills_dir: str = "skills"
 
     mcp_db_host: str = ""
     mcp_db_port: int = 5432

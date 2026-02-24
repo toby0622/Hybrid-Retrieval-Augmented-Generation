@@ -4,9 +4,8 @@ from typing import Any, List, Optional
 import httpx
 from app.core.config import settings
 from app.core.logger import logger
-from app.domain_init import get_active_domain
 from app.llm_factory import get_embedding, get_llm
-from app.schema_registry import SchemaRegistry
+from app.skill_registry import SkillRegistry, get_active_skill
 from app.state import DynamicSlotInfo, GraphState, RetrievalResult, SlotInfo
 from langchain_core.prompts import ChatPromptTemplate
 from neo4j import AsyncGraphDatabase
@@ -129,9 +128,9 @@ async def graph_search_node(state: GraphState) -> GraphState:
         slots = DynamicSlotInfo()
 
     query = state.get("query", "")
-    current_domain = get_active_domain()
+    current_skill = get_active_skill()
 
-    if not current_domain:
+    if not current_skill:
         return {**state, "graph_results": []}
 
     results: List[RetrievalResult] = []
@@ -146,18 +145,19 @@ async def graph_search_node(state: GraphState) -> GraphState:
 
                 cypher = ""
 
-                if current_domain.schema_name:
-                    schema = SchemaRegistry.get_schema(current_domain.schema_name)
-                    if schema and schema.extraction_prompt:
+                # Use inline schema from skill config for Cypher generation
+                if current_skill.kg_schema:
+                    schema_prompt = current_skill.kg_schema.build_extraction_prompt()
+                    if schema_prompt:
                         try:
                             cypher = await generate_cypher_query(
-                                query, schema.extraction_prompt, slots
+                                query, schema_prompt, slots
                             )
                         except Exception as gen_err:
                             logger.warning(f"Cypher query generation failed: {gen_err}")
 
                 if not cypher:
-                    cypher = current_domain.graph_queries.primary_search
+                    cypher = current_skill.graph_queries.primary_search
 
                 if not cypher:
                     return {**state, "graph_results": []}
@@ -233,7 +233,7 @@ async def vector_search_node(state: GraphState) -> GraphState:
     elif slots is None:
         slots = DynamicSlotInfo()
 
-    current_domain = get_active_domain()
+    current_skill = get_active_skill()
     results: List[RetrievalResult] = []
 
     try:
@@ -248,9 +248,9 @@ async def vector_search_node(state: GraphState) -> GraphState:
 
                 filter_conditions = []
 
-                if current_domain:
+                if current_skill:
                     filled_slots = slots.get_filled_slots()
-                    for field in current_domain.vector_filter_fields:
+                    for field in current_skill.vector_filter_fields:
                         if field in filled_slots:
                             filter_conditions.append(
                                 FieldCondition(
@@ -303,9 +303,8 @@ async def vector_search_node(state: GraphState) -> GraphState:
     return {**state, "vector_results": results}
 
 
-from app.services.skill_loader import SkillLoader
-
 async def skill_search_node(state: GraphState) -> GraphState:
+    """Execute relevant skill handlers via the SkillRegistry."""
     query = state.get("query", "")
     slots = state.get("slots")
     if isinstance(slots, SlotInfo):
@@ -313,7 +312,27 @@ async def skill_search_node(state: GraphState) -> GraphState:
     elif slots is None:
         slots = DynamicSlotInfo()
     
-    results = await SkillLoader.execute_relevant_skills(query, slots)
+    slot_dict = slots.get_filled_slots() if slots else {}
+    handler_results = await SkillRegistry.execute_handlers(query, slot_dict)
+    
+    # Transform handler results into RetrievalResult-compatible format
+    results = []
+    for hr in handler_results:
+        handler_name = hr.get("handler_name", "unknown")
+        output = hr.get("output", {})
+        results.append(
+            _make_serializable(
+                RetrievalResult(
+                    source="skill",
+                    title=f"Skill: {handler_name}",
+                    content=str(output.get("message", output)),
+                    metadata={"handler": handler_name},
+                    confidence=0.8,
+                    raw_data=output,
+                ).model_dump()
+            )
+        )
+    
     return {**state, "skill_results": results}
 
 

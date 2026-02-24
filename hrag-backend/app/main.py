@@ -10,14 +10,14 @@ from fastapi.middleware.cors import CORSMiddleware
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup
-    from app.domain_init import initialize_domain_system
+    from app.skill_registry import SkillRegistry
 
-    logger.info("Initializing domain system...")
+    logger.info("Initializing skill system...")
     try:
-        config = initialize_domain_system()
-        logger.info(f"Active domain: {config.display_name}")
+        config = SkillRegistry.initialize()
+        logger.info(f"Active skill: {config.display_name}")
     except Exception as e:
-        logger.exception(f"Domain initialization error: {e}")
+        logger.exception(f"Skill initialization error: {e}")
     yield
     # Shutdown (cleanup resources if needed)
 
@@ -25,7 +25,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="HRAG Backend API",
     description="Hybrid Retrieval-Augmented Generation API for DevOps Incident Response",
-    version="0.1.0",
+    version="0.2.0",
     lifespan=lifespan,
 )
 

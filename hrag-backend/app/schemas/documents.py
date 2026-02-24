@@ -13,7 +13,7 @@ class UploadResponse(BaseModel):
 
 class IngestResponse(BaseModel):
     file_name: str
-    domain: str
+    skill: str
     status: str
     entities_created: int
     relations_created: int

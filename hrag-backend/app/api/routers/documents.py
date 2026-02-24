@@ -105,7 +105,7 @@ async def ingest_document_endpoint(
 
         return IngestResponse(
             file_name=file.filename,
-            domain=result.domain,
+            skill=result.skill,
             status="success" if result.success else "partial",
             entities_created=result.entities_created,
             relations_created=result.relations_created,

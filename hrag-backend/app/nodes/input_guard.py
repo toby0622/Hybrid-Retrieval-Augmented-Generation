@@ -2,66 +2,66 @@ import json
 from typing import Literal, Optional
 
 from app.core.config import settings
-from app.domain_config import DomainRegistry
-from app.domain_init import get_active_domain, list_available_domains, switch_domain
+from app.core.logger import logger
 from app.llm_factory import get_llm
+from app.skill_registry import SkillRegistry, get_active_skill, list_available_skills, switch_skill
 from app.state import DynamicSlotInfo, GraphState, SlotInfo
 from langchain_core.prompts import ChatPromptTemplate
 
 
-def _get_domain_routing_prompt(domains: list) -> ChatPromptTemplate:
-    domain_descriptions = []
-    for domain_name in domains:
-        config = DomainRegistry.get_domain(domain_name)
+def _get_skill_routing_prompt(skills: list) -> ChatPromptTemplate:
+    skill_descriptions = []
+    for skill_name in skills:
+        config = SkillRegistry.get_skill(skill_name)
         if config:
             keywords_sample = (
                 config.routing_keywords[:10] if config.routing_keywords else []
             )
             keywords_str = ", ".join(str(k) for k in keywords_sample)
-            domain_descriptions.append(
-                f'<domain name="{domain_name}">\n'
+            skill_descriptions.append(
+                f'<skill name="{skill_name}">\n'
                 f"  Display: {config.display_name}\n"
                 f"  Description: {config.description}\n"
                 f"  Keywords: {keywords_str}\n"
-                f"</domain>"
+                f"</skill>"
             )
 
-    domains_xml = "\n".join(domain_descriptions)
-    domain_names = ", ".join(domains)
+    skills_xml = "\n".join(skill_descriptions)
+    skill_names = ", ".join(skills)
 
     system_prompt = f"""<!-- 1. Task Context -->
-You are DomainRouter. Your task is to classify which domain should handle the user's query.
+You are SkillRouter. Your task is to classify which skill should handle the user's query.
 
 <!-- 2. Tone Context -->
-Be decisive and analytical. Match the query's core topic to the most relevant domain.
-When the topic is ambiguous, prioritize the domain with more specific keywords.
+Be decisive and analytical. Match the query's core topic to the most relevant skill.
+When the topic is ambiguous, prioritize the skill with more specific keywords.
 
 <!-- 3. Background Data -->
-<available_domains>
-{domains_xml}
-</available_domains>
+<available_skills>
+{skills_xml}
+</available_skills>
 
 <!-- 4. Detailed Task Description & Rules -->
 RULES:
-1. Output ONLY the domain name: {domain_names}
-2. Choose the domain that best matches the user's query topic
-3. If unsure, pick the most likely domain based on context
-4. No explanation, just the domain name
+1. Output ONLY the skill name: {skill_names}
+2. Choose the skill that best matches the user's query topic
+3. If unsure, pick the most likely skill based on context
+4. No explanation, just the skill name
 
 <!-- 5. Examples -->
 <examples>
   <example>
-    <query>How do I reset my password?</query>
-    <output>hr</output>
+    <query>The api-gateway is returning 502 errors</query>
+    <output>devops_incident</output>
   </example>
   <example>
-    <query>What are the latest sales figures?</query>
-    <output>finance</output>
+    <query>Hello, how are you?</query>
+    <output>hello</output>
   </example>
 </examples>
 
 <!-- 9. Output Formatting -->
-Output: A single domain name from [{domain_names}]. No punctuation, no explanation."""
+Output: A single skill name from [{skill_names}]. No punctuation, no explanation."""
 
     return ChatPromptTemplate.from_messages(
         [
@@ -71,37 +71,38 @@ Output: A single domain name from [{domain_names}]. No punctuation, no explanati
     )
 
 
-async def _detect_domain_async(query: str) -> Optional[str]:
-    available_domains = list_available_domains()
+async def _detect_skill_async(query: str) -> Optional[str]:
+    available_skills = list_available_skills()
 
-    if not available_domains:
+    if not available_skills:
         return None
 
-    if len(available_domains) == 1:
-        return available_domains[0]
+    if len(available_skills) == 1:
+        return available_skills[0]
 
     llm = get_llm()
-    prompt = _get_domain_routing_prompt(available_domains)
+    prompt = _get_skill_routing_prompt(available_skills)
     chain = prompt | llm
 
     try:
         result = await chain.ainvoke({"query": query})
         detected = result.content.strip().lower()
 
-        for domain_name in available_domains:
-            if domain_name.lower() in detected:
-                return domain_name
+        for skill_name in available_skills:
+            if skill_name.lower() in detected:
+                return skill_name
 
-        return available_domains[0]
+        return available_skills[0]
 
     except Exception as e:
-        return available_domains[0]
+        logger.warning(f"Skill routing failed, defaulting to first skill: {e}")
+        return available_skills[0]
 
 
-def _get_classification_prompt(domain_config) -> ChatPromptTemplate:
+def _get_classification_prompt(skill_config) -> ChatPromptTemplate:
     categories_xml = "<categories>\n"
-    for intent in domain_config.intents:
-        keywords = domain_config.intent_keywords.get(intent, [])
+    for intent in skill_config.intents:
+        keywords = skill_config.intent_keywords.get(intent, [])
         keywords_str = (
             ", ".join([str(k) for k in keywords]) if keywords else "general query"
         )
@@ -111,7 +112,7 @@ def _get_classification_prompt(domain_config) -> ChatPromptTemplate:
     categories_xml += "</categories>"
 
     system_prompt = f"""<!-- 1. Task Context -->
-{domain_config.classification_prompt.system_identity or "You are IntentClassifier."}
+{skill_config.classification_prompt.system_identity or "You are IntentClassifier."}
 
 <!-- 2. Tone Context -->
 Be decisive and consistent. When the intent is ambiguous, lean toward the more specific action-oriented category.
@@ -124,7 +125,7 @@ Never classify greetings as actionable intents.
 Classify the user's message into exactly ONE of the following categories.
 
 STRICT RULES:
-1. Output ONLY the category name: {", ".join(domain_config.intents)}
+1. Output ONLY the category name: {", ".join(skill_config.intents)}
 2. Do not include any explanation or additional text
 3. Match intent based on keywords and context
 4. Default to 'chat' for greetings, thanks, or off-topic queries
@@ -147,7 +148,7 @@ STRICT RULES:
 
 <!-- 9. Output Formatting -->
 Output format: Single word, lowercase, no punctuation.
-Valid outputs: {" | ".join(domain_config.intents)}"""
+Valid outputs: {" | ".join(skill_config.intents)}"""
 
     return ChatPromptTemplate.from_messages(
         [
@@ -157,18 +158,18 @@ Valid outputs: {" | ".join(domain_config.intents)}"""
     )
 
 
-def _get_slot_extraction_prompt(domain_config) -> ChatPromptTemplate:
+def _get_slot_extraction_prompt(skill_config) -> ChatPromptTemplate:
     slots_xml = "<slot_schema>\n"
 
-    for slot in domain_config.slots.required:
-        examples = domain_config.slots.examples.get(slot, [])
+    for slot in skill_config.slots.required:
+        examples = skill_config.slots.examples.get(slot, [])
         ex_str = f"Examples: {', '.join(examples)}" if examples else ""
         slots_xml += f'  <slot name="{slot}" type="string" required="true">\n'
         slots_xml += f"    Required field. {ex_str}\n"
         slots_xml += "  </slot>\n"
 
-    for slot in domain_config.slots.optional:
-        examples = domain_config.slots.examples.get(slot, [])
+    for slot in skill_config.slots.optional:
+        examples = skill_config.slots.examples.get(slot, [])
         ex_str = f"Examples: {', '.join(examples)}" if examples else ""
         slots_xml += f'  <slot name="{slot}" type="string" required="false">\n'
         slots_xml += f"    Optional field. {ex_str}\n"
@@ -181,7 +182,7 @@ def _get_slot_extraction_prompt(domain_config) -> ChatPromptTemplate:
     # LangChain: {{ -> { after second interpolation
     schema_fields = [
         f'"{s}": "string|null"'
-        for s in domain_config.slots.required + domain_config.slots.optional
+        for s in skill_config.slots.required + skill_config.slots.optional
     ]
     schema_str = "{{{{" + ", ".join(schema_fields) + "}}}}"
 
@@ -234,15 +235,15 @@ async def input_guard_node(state: GraphState) -> GraphState:
 
     clarification_response = state.get("clarification_response")
     if clarification_response:
-        current_domain = get_active_domain()
+        current_skill = get_active_skill()
 
         logger.debug(
             f"Processing clarification response: {clarification_response}"
         )
 
-        if current_domain and state.get("slots"):
+        if current_skill and state.get("slots"):
             llm = get_llm()
-            extraction_prompt = _get_slot_extraction_prompt(current_domain)
+            extraction_prompt = _get_slot_extraction_prompt(current_skill)
             extraction_chain = extraction_prompt | llm
 
             existing_slots = state.get("slots")
@@ -263,7 +264,7 @@ User answered: {clarification_response}"""
                 content = result.content.strip()
 
                 # Normalize smart quotes to standard quotes
-                content = content.replace("“", '"').replace("”", '"')
+                content = content.replace("\u201c", '"').replace("\u201d", '"')
 
                 logger.debug(f"Raw extraction result: {repr(content)}")
 
@@ -311,29 +312,29 @@ User answered: {clarification_response}"""
             return {
                 **state,
                 "slots": existing_slots,
-                # Keep existing domain and intent
-                "domain": state.get("domain"),
+                # Keep existing skill and intent
+                "skill": state.get("skill"),
                 "intent": state.get("intent"),
                 "clarification_count": state.get("clarification_count", 0),
                 "clarification_response": None,
             }
 
-    detected_domain = await _detect_domain_async(query)
-    if detected_domain:
-        switch_domain(detected_domain)
+    detected_skill = await _detect_skill_async(query)
+    if detected_skill:
+        switch_skill(detected_skill)
 
-    current_domain = get_active_domain()
+    current_skill = get_active_skill()
 
-    if not current_domain:
-        logger.error("No active domain loaded!")
-        return {**state, "intent": "end", "response": "System error: No domain loaded."}
+    if not current_skill:
+        logger.error("No active skill loaded!")
+        return {**state, "intent": "end", "response": "System error: No skill loaded."}
 
     if not query.strip():
         return {**state, "intent": "chat", "response": "Please provide a message."}
 
     llm = get_llm()
 
-    classification_prompt = _get_classification_prompt(current_domain)
+    classification_prompt = _get_classification_prompt(current_skill)
     classification_chain = classification_prompt | llm
 
     try:
@@ -343,18 +344,18 @@ User answered: {clarification_response}"""
         logger.warning(f"Intent classification failed, defaulting to chat: {e}")
         intent_raw = "chat"
 
-    valid_intents = current_domain.intents
+    valid_intents = current_skill.intents
     matched_intent = next((i for i in valid_intents if i in intent_raw), "chat")
 
     needs_slots = matched_intent not in ["chat", "end"]
 
     slots = DynamicSlotInfo()
     slots.configure(
-        required=current_domain.slots.required, optional=current_domain.slots.optional
+        required=current_skill.slots.required, optional=current_skill.slots.optional
     )
 
     if needs_slots:
-        extraction_prompt = _get_slot_extraction_prompt(current_domain)
+        extraction_prompt = _get_slot_extraction_prompt(current_skill)
         extraction_chain = extraction_prompt | llm
 
         try:
@@ -399,7 +400,7 @@ User answered: {clarification_response}"""
 
     return {
         **state,
-        "domain": current_domain.name,
+        "skill": current_skill.name,
         "intent": matched_intent,
         "slots": slots,
         "clarification_count": state.get("clarification_count", 0),

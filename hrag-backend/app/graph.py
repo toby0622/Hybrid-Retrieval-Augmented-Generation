@@ -111,7 +111,7 @@ async def run_query(
         initial_state: GraphState = {
             "query": query,
             "messages": existing_state.get("messages", []),
-            "domain": existing_state.get("domain"),
+            "skill": existing_state.get("skill") or existing_state.get("domain"),
             "intent": existing_state.get("intent"),
             "slots": existing_state.get("slots"),
             "original_query": existing_state.get("original_query"),
