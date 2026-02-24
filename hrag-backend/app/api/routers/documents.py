@@ -230,7 +230,7 @@ async def get_document(doc_id: str):
 @router.put("/documents/{doc_id}")
 async def update_document(doc_id: str, request: UpdateDocumentRequest):
     try:
-        from app.services.ingestion import get_embedding
+        from app.llm_factory import get_embedding
         from qdrant_client import QdrantClient
         from qdrant_client.models import PointStruct
 
@@ -277,6 +277,7 @@ async def update_document(doc_id: str, request: UpdateDocumentRequest):
 
 @router.get("/nodes", response_model=List[NodeResponse])
 async def list_nodes(limit: int = 50, offset: int = 0, search: Optional[str] = None):
+    driver = None
     try:
         from neo4j import GraphDatabase
 
@@ -343,15 +344,18 @@ async def list_nodes(limit: int = 50, offset: int = 0, search: Optional[str] = N
                         )
                     )
 
-        driver.close()
         return nodes
     except Exception as e:
         logger.exception(f"Error listing nodes: {e}")
         raise HTTPException(status_code=500, detail="Internal Server Error")
+    finally:
+        if driver:
+            driver.close()
 
 
 @router.get("/nodes/{node_id}", response_model=NodeResponse)
 async def get_node(node_id: str):
+    driver = None
     try:
         from neo4j import GraphDatabase
 
@@ -375,7 +379,6 @@ async def get_node(node_id: str):
                     record = result.single()
 
             if not record:
-                driver.close()
                 raise HTTPException(status_code=404, detail="Node not found")
 
             node = record["n"]
@@ -387,17 +390,20 @@ async def get_node(node_id: str):
                 properties=serialize_neo4j_properties(dict(node)),
             )
 
-        driver.close()
         return response
     except HTTPException:
         raise
     except Exception as e:
         logger.exception(f"Error getting node {node_id}: {e}")
         raise HTTPException(status_code=500, detail="Internal Server Error")
+    finally:
+        if driver:
+            driver.close()
 
 
 @router.put("/nodes/{node_id}")
 async def update_node(node_id: str, request: UpdateNodeRequest):
+    driver = None
     try:
         from neo4j import GraphDatabase
 
@@ -430,13 +436,14 @@ async def update_node(node_id: str, request: UpdateNodeRequest):
                 result = session.run(query, node_id=node_id, props=request.properties)
 
             if not result.single():
-                driver.close()
                 raise HTTPException(status_code=404, detail="Node not found")
 
-        driver.close()
         return {"status": "success", "message": "Node properties updated"}
     except HTTPException:
         raise
     except Exception as e:
         logger.exception(f"Error updating node {node_id}: {e}")
         raise HTTPException(status_code=500, detail="Internal Server Error")
+    finally:
+        if driver:
+            driver.close()

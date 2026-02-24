@@ -1,3 +1,4 @@
+from app.core.logger import logger
 from app.nodes.feedback import feedback_node, route_after_feedback
 from app.nodes.input_guard import input_guard_node, route_after_guard
 from app.nodes.reasoning import reasoning_node
@@ -78,7 +79,15 @@ def compile_graph(with_checkpointer: bool = True):
     return workflow.compile()
 
 
-graph = compile_graph(with_checkpointer=True)
+_graph = None
+
+
+def _get_graph():
+    """Lazy initialization of the compiled graph."""
+    global _graph
+    if _graph is None:
+        _graph = compile_graph(with_checkpointer=True)
+    return _graph
 
 
 async def run_query(
@@ -88,11 +97,11 @@ async def run_query(
 
     existing_state = None
     try:
-        state_snapshot = graph.get_state(config)
+        state_snapshot = _get_graph().get_state(config)
         if state_snapshot and state_snapshot.values:
             existing_state = state_snapshot.values
-    except Exception:
-        pass
+    except Exception as e:
+        logger.debug(f"No existing state snapshot for thread {thread_id}: {e}")
 
     is_clarification_response = existing_state and existing_state.get(
         "awaiting_clarification", False
@@ -122,6 +131,6 @@ async def run_query(
     if feedback:
         initial_state["feedback"] = feedback
 
-    result = await graph.ainvoke(initial_state, config)
+    result = await _get_graph().ainvoke(initial_state, config)
 
     return result

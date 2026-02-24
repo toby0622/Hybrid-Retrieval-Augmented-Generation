@@ -8,7 +8,7 @@ export interface SlotInfo {
 }
 
 export interface RetrievalResult {
-  source: 'graph' | 'vector' | 'mcp_tool';
+  source: 'graph' | 'vector' | 'skill';
   title: string;
   content: string;
   metadata: Record<string, unknown>;
@@ -70,30 +70,30 @@ export interface EntityConflict {
   confidence: number;
   existing_entity?: {
     name: string;
-    desc: string;
+    description: string;
   };
   new_entity: {
     name: string;
-    desc: string;
+    description: string;
   };
   description?: string;
 }
 
 export interface GardenerTask {
-  id: number;
+  id: string;
   type: 'conflict' | 'new';
-  entityName: string;
+  entity_name: string;
   source: string;
   confidence: number;
-  existingEntity?: {
+  existing_entity?: {
     name: string;
-    desc: string;
+    description: string;
   };
-  newEntity?: {
+  new_entity?: {
     name: string;
-    desc: string;
+    description: string;
   };
-  desc?: string;
+  description?: string;
 }
 
 export interface Toast {

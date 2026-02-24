@@ -1,13 +1,15 @@
 from typing import Any, Dict, List, Literal, Optional, TypedDict, Union
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field, PrivateAttr
 
 
 class DynamicSlotInfo(BaseModel):
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
     slots: Dict[str, Optional[str]] = Field(default_factory=dict)
 
-    _required_slots: List[str] = []
-    _optional_slots: List[str] = []
+    _required_slots: List[str] = PrivateAttr(default_factory=list)
+    _optional_slots: List[str] = PrivateAttr(default_factory=list)
 
     def set_slot(self, name: str, value: Optional[str]) -> None:
         self.slots[name] = value
@@ -39,9 +41,6 @@ class DynamicSlotInfo(BaseModel):
                 display_name = name.replace("_", " ").title()
                 parts.append(f"{display_name}: {value}")
         return "\n".join(parts) if parts else "No specific details provided yet."
-
-    class Config:
-        underscore_attrs_are_private = True
 
 
 class SlotInfo(BaseModel):
@@ -99,7 +98,7 @@ class DiagnosticStep(BaseModel):
     status: Literal["info", "warning", "error"]
     is_root: bool = False
     is_parallel: bool = False
-    raw_content: Dict[str, Any] = Field(default_factory=dict)
+    raw_content: Optional[Dict[str, Any]] = Field(default_factory=dict)
 
 
 class DiagnosticResponse(BaseModel):

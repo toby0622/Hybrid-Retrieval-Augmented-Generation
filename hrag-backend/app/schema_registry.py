@@ -3,6 +3,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+from app.core.logger import logger
+
 
 @dataclass
 class EntityType:
@@ -76,7 +78,7 @@ class SchemaRegistry:
             try:
                 cls._load_schema_from_file(schema_name, schema_file)
             except Exception as e:
-                print(f"[SchemaRegistry] Warning: Failed to load {schema_file}: {e}")
+                logger.warning(f"Failed to load schema {schema_file}: {e}")
 
         return discovered
 

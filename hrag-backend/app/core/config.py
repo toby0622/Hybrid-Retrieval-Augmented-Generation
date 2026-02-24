@@ -12,6 +12,7 @@ class Settings(BaseSettings):
     embedding_base_url: str = ""
     embedding_api_key: str = ""
     embedding_model_name: str = ""
+    embedding_dim: int = 768
 
 
     neo4j_uri: str = ""
@@ -27,6 +28,13 @@ class Settings(BaseSettings):
     debug: bool = False
 
     active_domain: Optional[str] = None
+
+    mcp_db_host: str = ""
+    mcp_db_port: int = 5432
+    mcp_db_name: str = ""
+    mcp_db_user: str = ""
+    mcp_db_password: str = ""
+    mcp_enabled: bool = False
 
     class Config:
         env_file = ".env"

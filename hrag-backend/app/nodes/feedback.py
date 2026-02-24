@@ -101,6 +101,7 @@ async def feedback_node(state: GraphState) -> GraphState:
 
 async def _generate_case_study(state: GraphState) -> GraphState:
     from app.services.ingestion import ingest_document
+    from app.state import DynamicSlotInfo
 
     slots = state.get("slots", SlotInfo())
     diagnostic = state.get("diagnostic")
@@ -113,6 +114,17 @@ async def _generate_case_study(state: GraphState) -> GraphState:
             "response": "Cannot generate case study: No diagnostic analysis found.",
         }
 
+    # Handle both SlotInfo and DynamicSlotInfo
+    if isinstance(slots, DynamicSlotInfo):
+        service = slots.get_slot("service_name") or "Unknown"
+        error_type = slots.get_slot("error_type") or "Unknown"
+    elif isinstance(slots, SlotInfo):
+        service = slots.service_name or "Unknown"
+        error_type = slots.error_type or "Unknown"
+    else:
+        service = "Unknown"
+        error_type = "Unknown"
+
     diagnostic_summary = "\n".join(
         [f"- {step.title}: {step.detail}" for step in diagnostic.path]
     )
@@ -123,8 +135,8 @@ async def _generate_case_study(state: GraphState) -> GraphState:
         result = await chain.ainvoke(
             {
                 "query": query,
-                "service": slots.service_name or "Unknown",
-                "error_type": slots.error_type or "Unknown",
+                "service": service,
+                "error_type": error_type,
                 "diagnostic_summary": diagnostic_summary,
                 "suggestion": diagnostic.suggestion,
             }
@@ -133,11 +145,11 @@ async def _generate_case_study(state: GraphState) -> GraphState:
 
         ingest_result = await ingest_document(
             content=case_study_content,
-            filename=f"CaseStudy_{slots.service_name}_{slots.error_type}.md",
+            filename=f"CaseStudy_{service}_{error_type}.md",
             doc_type="case_study",
         )
 
-        success_msg = f"\n\n**Case Study Generated and Archived**\n- Domain: {ingest_result.domain}\n- Entities: {ingest_result.entities_created}\n- Status: {ingest_result.status}"
+        success_msg = f"\n\n**Case Study Generated and Archived**\n- Domain: {ingest_result.domain}\n- Entities: {ingest_result.entities_created}\n- Status: {'success' if ingest_result.success else 'partial'}"
 
         return {
             **state,

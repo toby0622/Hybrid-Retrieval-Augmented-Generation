@@ -2,6 +2,7 @@ from pathlib import Path
 from typing import Optional
 
 from app.core.config import settings
+from app.core.logger import logger
 from app.domain_config import DomainConfig, DomainRegistry
 from app.schema_registry import Schema, SchemaRegistry
 
@@ -25,28 +26,30 @@ def initialize_domain_system(
     if active_domain is None:
         active_domain = settings.active_domain
 
-    print(f"[Domain] Initializing domain system...")
-    print(f"   Scripts path: {scripts_path}")
-    print(f"   Domains path: {domains_path}")
+    logger.info("Initializing domain system...")
+    logger.info(f"   Scripts path: {scripts_path}")
+    logger.info(f"   Domains path: {domains_path}")
 
     schemas = SchemaRegistry.discover(scripts_path)
-    print(f"   Discovered schemas: {schemas}")
+    logger.info(f"   Discovered schemas: {schemas}")
 
     domains = DomainRegistry.discover(domains_path)
-    print(f"   Discovered domains: {domains}")
+    logger.info(f"   Discovered domains: {domains}")
 
     if not domains:
         raise ValueError(f"No domain configs found in {domains_path}")
 
     if not active_domain:
         if domains:
-            print(
-                f"   [INFO] No active domain configured, defaulting to '{domains[0]}'"
+            logger.info(
+                f"   No active domain configured, defaulting to '{domains[0]}'"
             )
             active_domain = domains[0]
 
     if active_domain not in domains:
-        print(f"   [WARN] Domain '{active_domain}' not found, using first available")
+        logger.warning(
+            f"   Domain '{active_domain}' not found, using first available"
+        )
         active_domain = domains[0]
 
     success = DomainRegistry.set_active(active_domain)
@@ -57,9 +60,9 @@ def initialize_domain_system(
     if config is None:
         raise ValueError("No active domain configuration")
 
-    print(f"   Active domain: {config.display_name}")
-    print(f"   Intents: {config.intents}")
-    print(f"   Required slots: {config.slots.required}")
+    logger.info(f"   Active domain: {config.display_name}")
+    logger.info(f"   Intents: {config.intents}")
+    logger.info(f"   Required slots: {config.slots.required}")
 
     return config
 

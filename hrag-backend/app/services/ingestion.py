@@ -9,7 +9,7 @@ from app.domain_config import DomainRegistry
 from app.domain_init import (
     get_active_domain,
     list_available_domains,
-    load_domain_config,
+    switch_domain,
 )
 from app.llm_factory import get_embedding, get_llm
 from app.schema_registry import SchemaRegistry
@@ -220,6 +220,8 @@ async def write_entities_to_neo4j(entities: List[ExtractedEntity]) -> tuple[int,
 async def write_document_to_qdrant(
     content: str, filename: str, domain: str, doc_type: str = "document"
 ) -> int:
+    import uuid as uuid_mod
+
     client = QdrantClient(host=settings.qdrant_host, port=settings.qdrant_port)
 
     collections = client.get_collections()
@@ -230,14 +232,8 @@ async def write_document_to_qdrant(
 
         client.create_collection(
             collection_name=settings.qdrant_collection,
-            vectors_config=VectorParams(size=768, distance=Distance.COSINE),
+            vectors_config=VectorParams(size=settings.embedding_dim, distance=Distance.COSINE),
         )
-
-    try:
-        info = client.get_collection(settings.qdrant_collection)
-        next_id = info.points_count
-    except:
-        next_id = 0
 
     chunks = _chunk_document(content)
     points = []
@@ -246,9 +242,10 @@ async def write_document_to_qdrant(
         embed_text = f"{filename}\n\n{chunk}"
         embedding = await get_embedding(embed_text)
 
+        point_id = str(uuid_mod.uuid4())
         points.append(
             PointStruct(
-                id=next_id + i,
+                id=point_id,
                 vector=embedding,
                 payload={
                     "title": filename,

@@ -3,6 +3,7 @@ from typing import Any, List, Optional
 
 import httpx
 from app.core.config import settings
+from app.core.logger import logger
 from app.domain_init import get_active_domain
 from app.llm_factory import get_embedding, get_llm
 from app.schema_registry import SchemaRegistry
@@ -12,7 +13,7 @@ from neo4j import AsyncGraphDatabase
 from qdrant_client import QdrantClient
 from qdrant_client.models import FieldCondition, Filter, MatchText
 
-EMBEDDING_DIM = 768
+EMBEDDING_DIM = settings.embedding_dim
 
 
 async def generate_cypher_query(
@@ -153,7 +154,7 @@ async def graph_search_node(state: GraphState) -> GraphState:
                                 query, schema.extraction_prompt, slots
                             )
                         except Exception as gen_err:
-                            pass
+                            logger.warning(f"Cypher query generation failed: {gen_err}")
 
                 if not cypher:
                     cypher = current_domain.graph_queries.primary_search
@@ -195,7 +196,7 @@ async def graph_search_node(state: GraphState) -> GraphState:
                     )
 
     except Exception as e:
-        pass
+        logger.error(f"Graph search failed: {e}")
 
     return {**state, "graph_results": results}
 
@@ -289,15 +290,15 @@ async def vector_search_node(state: GraphState) -> GraphState:
                             )
                         )
                 except Exception as search_err:
-                    pass
+                    logger.warning(f"Vector search query failed: {search_err}")
 
             else:
-                pass
+                logger.debug(f"Qdrant collection '{settings.qdrant_collection}' not found")
         else:
-            pass
+            logger.warning("Qdrant client not available for vector search")
 
     except Exception as e:
-        pass
+        logger.error(f"Vector search failed: {e}")
 
     return {**state, "vector_results": results}
 

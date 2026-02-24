@@ -4,6 +4,7 @@ import os
 from abc import ABC, abstractmethod
 from typing import Any, Dict, List, Optional, Type
 
+from app.core.logger import logger
 from app.state import DynamicSlotInfo, GraphState, RetrievalResult, SlotInfo
 
 
@@ -60,9 +61,9 @@ class SkillLoader:
                             ):
                                 skill_instance = obj()
                                 cls._skills[skill_instance.name] = skill_instance
-                                print(f"[SkillLoader] Loaded skill: {skill_instance.name}")
+                                logger.info(f"Loaded skill: {skill_instance.name}")
                 except Exception as e:
-                    print(f"[SkillLoader] Failed to load skill {filename}: {e}")
+                    logger.error(f"Failed to load skill {filename}: {e}")
 
     @classmethod
     def get_skill(cls, name: str) -> Optional[Skill]:
@@ -113,6 +114,6 @@ class SkillLoader:
                             )
                         )
                 except Exception as e:
-                    print(f"[SkillLoader] Error executing skill {skill.name}: {e}")
+                    logger.error(f"Error executing skill {skill.name}: {e}")
 
         return results

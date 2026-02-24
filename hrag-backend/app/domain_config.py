@@ -4,6 +4,8 @@ from typing import Any, Dict, List, Optional
 
 import yaml
 
+from app.core.logger import logger
+
 
 @dataclass
 class SlotConfig:
@@ -120,7 +122,7 @@ class DomainRegistry:
             raise ValueError("Domains path not set. Call set_domains_path() first.")
 
         if not cls._domains_path.exists():
-            print(f"[DomainRegistry] Domains path does not exist: {cls._domains_path}")
+            logger.warning(f"Domains path does not exist: {cls._domains_path}")
             return []
 
         yaml_files = list(cls._domains_path.glob("*.yaml")) + list(
@@ -136,7 +138,7 @@ class DomainRegistry:
                 config = DomainConfig.from_yaml(yaml_file)
                 cls._domains[config.name] = config
             except Exception as e:
-                print(f"[DomainRegistry] Warning: Failed to load {yaml_file}: {e}")
+                logger.warning(f"Failed to load domain config {yaml_file}: {e}")
 
         return discovered
 
@@ -158,9 +160,9 @@ class DomainRegistry:
     def set_active(cls, name: str) -> bool:
         if name in cls._domains:
             cls._active_domain = name
-            print(f"[DomainRegistry] Active domain set to: {name}")
+            logger.info(f"Active domain set to: {name}")
             return True
-        print(f"[DomainRegistry] Domain not found: {name}")
+        logger.warning(f"Domain not found: {name}")
         return False
 
     @classmethod

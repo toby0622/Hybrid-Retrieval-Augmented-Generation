@@ -236,8 +236,8 @@ async def input_guard_node(state: GraphState) -> GraphState:
     if clarification_response:
         current_domain = get_active_domain()
 
-        print(
-            f"[InputGuard] Processing clarification response: {clarification_response}"
+        logger.debug(
+            f"Processing clarification response: {clarification_response}"
         )
 
         if current_domain and state.get("slots"):
@@ -256,7 +256,7 @@ async def input_guard_node(state: GraphState) -> GraphState:
 System asked: {prev_clarification}
 User answered: {clarification_response}"""
 
-            print(f"[InputGuard] Enriched context for extraction: {enriched_query}")
+            logger.debug(f"Enriched context for extraction: {enriched_query}")
 
             try:
                 result = await extraction_chain.ainvoke({"query": enriched_query})
@@ -265,7 +265,7 @@ User answered: {clarification_response}"""
                 # Normalize smart quotes to standard quotes
                 content = content.replace("“", '"').replace("”", '"')
 
-                print(f"[InputGuard] Raw extraction result: {repr(content)}")
+                logger.debug(f"Raw extraction result: {repr(content)}")
 
                 if not content.startswith("{"):
                     content = "{" + content
@@ -284,17 +284,17 @@ User answered: {clarification_response}"""
                 if brace_count > 0:
                     content = content + "}" * brace_count
 
-                print(f"[InputGuard] Cleaned JSON: {content}")
+                logger.debug(f"Cleaned JSON: {content}")
 
                 slot_data = json.loads(content)
 
                 for key, value in slot_data.items():
                     if value is not None:
                         existing_slots.set_slot(key, value)
-                        print(f"[InputGuard] Set slot {key} = {value}")
+                        logger.debug(f"Set slot {key} = {value}")
 
             except json.JSONDecodeError as e:
-                print(f"[InputGuard] JSON parse error: {e}")
+                logger.warning(f"JSON parse error during slot extraction: {e}")
                 import re
 
                 pattern = r'"(\w+)":\s*"([^"]+)"'
@@ -302,11 +302,11 @@ User answered: {clarification_response}"""
                 for key, value in matches:
                     if value and value.lower() != "null":
                         existing_slots.set_slot(key, value)
-                        print(f"[InputGuard] Fallback set slot {key} = {value}")
+                        logger.debug(f"Fallback set slot {key} = {value}")
             except Exception as e:
-                print(f"[InputGuard] Clarification slot extraction error: {e}")
+                logger.error(f"Clarification slot extraction error: {e}")
 
-            print(f"[InputGuard] Final slots: {existing_slots.get_filled_slots()}")
+            logger.debug(f"Final slots: {existing_slots.get_filled_slots()}")
 
             return {
                 **state,
@@ -325,7 +325,7 @@ User answered: {clarification_response}"""
     current_domain = get_active_domain()
 
     if not current_domain:
-        print("[Error] No active domain loaded!")
+        logger.error("No active domain loaded!")
         return {**state, "intent": "end", "response": "System error: No domain loaded."}
 
     if not query.strip():
@@ -340,6 +340,7 @@ User answered: {clarification_response}"""
         result = await classification_chain.ainvoke({"query": query})
         intent_raw = result.content.strip().lower()
     except Exception as e:
+        logger.warning(f"Intent classification failed, defaulting to chat: {e}")
         intent_raw = "chat"
 
     valid_intents = current_domain.intents
@@ -362,10 +363,21 @@ User answered: {clarification_response}"""
 
             if not content.startswith("{"):
                 content = "{" + content
+
             if "```" in content:
-                content = content.split("```")[1]
-                if content.startswith("json"):
-                    content = content[4:]
+                parts = content.split("```")
+                for part in parts:
+                    if part.strip().startswith("json"):
+                        content = part.strip()[4:].strip()
+                        break
+                    elif part.strip().startswith("{"):
+                        content = part.strip()
+                        break
+
+            # Balance braces
+            brace_count = content.count("{") - content.count("}")
+            if brace_count > 0:
+                content = content + "}" * brace_count
 
             slot_data = json.loads(content)
 
@@ -373,8 +385,17 @@ User answered: {clarification_response}"""
                 if value is not None:
                     slots.set_slot(key, value)
 
+        except json.JSONDecodeError as e:
+            logger.warning(f"Initial slot extraction JSON parse error: {e}")
+            import re
+
+            pattern = r'"(\w+)":\s*"([^"]+)"'
+            matches = re.findall(pattern, content)
+            for key, value in matches:
+                if value and value.lower() != "null":
+                    slots.set_slot(key, value)
         except Exception as e:
-            pass
+            logger.warning(f"Slot extraction failed: {e}")
 
     return {
         **state,
