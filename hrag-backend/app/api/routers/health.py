@@ -1,14 +1,18 @@
+import asyncio
+
 from app.core.config import settings
 from app.core.logger import logger
 from app.schemas.common import HealthResponse
+from app.services.gardener import gardener_tasks
 from fastapi import APIRouter
+from neo4j import GraphDatabase
+from qdrant_client import QdrantClient
 
 router = APIRouter()
 
 
 @router.get("/health", response_model=HealthResponse)
 async def health_check():
-    import asyncio
 
     async def check_service(check_func, timeout=2.0):
         try:
@@ -24,7 +28,6 @@ async def health_check():
 
     def check_neo4j_sync():
         try:
-            from neo4j import GraphDatabase
 
             driver = GraphDatabase.driver(
                 settings.neo4j_uri, auth=(settings.neo4j_user, settings.neo4j_password)
@@ -39,7 +42,6 @@ async def health_check():
 
     def check_qdrant_sync():
         try:
-            from qdrant_client import QdrantClient
 
             client = QdrantClient(
                 host=settings.qdrant_host, port=settings.qdrant_port, timeout=2.0
@@ -69,13 +71,11 @@ async def health_check():
 
 @router.get("/stats")
 async def get_stats():
-    from app.services.gardener import gardener_tasks
 
     indexed_documents = 0
     knowledge_nodes = 0
 
     try:
-        from qdrant_client import QdrantClient
 
         client = QdrantClient(host=settings.qdrant_host, port=settings.qdrant_port)
         collections = client.get_collections()
@@ -88,7 +88,6 @@ async def get_stats():
         logger.error(f"Qdrant stats error: {e}")
 
     try:
-        from neo4j import GraphDatabase
 
         driver = GraphDatabase.driver(
             settings.neo4j_uri, auth=(settings.neo4j_user, settings.neo4j_password)

@@ -1,6 +1,9 @@
 import uuid
 from typing import List, Optional
 
+from qdrant_client.models import FieldCondition, Filter, MatchText, PointStruct
+from app.services.ingestion import ingest_document
+
 from app.core.config import settings
 from app.core.logger import logger
 from app.core.utils import serialize_neo4j_properties
@@ -22,8 +25,45 @@ from app.services.gardener import (
     remove_task,
 )
 from fastapi import APIRouter, BackgroundTasks, File, HTTPException, UploadFile
+from neo4j import GraphDatabase
+from qdrant_client import QdrantClient
 
 router = APIRouter()
+
+
+# ─── Shared DB clients (singletons) ───
+
+_neo4j_driver = None
+_qdrant_client = None
+
+
+def _get_neo4j_driver():
+    """Get or create a shared sync Neo4j driver."""
+    global _neo4j_driver
+    if _neo4j_driver is None:
+        _neo4j_driver = GraphDatabase.driver(
+            settings.neo4j_uri, auth=(settings.neo4j_user, settings.neo4j_password)
+        )
+    return _neo4j_driver
+
+
+def _get_qdrant_client():
+    """Get or create a shared Qdrant client."""
+    global _qdrant_client
+    if _qdrant_client is None:
+        _qdrant_client = QdrantClient(
+            host=settings.qdrant_host, port=settings.qdrant_port
+        )
+    return _qdrant_client
+
+
+def close_document_clients():
+    """Cleanup DB clients on shutdown."""
+    global _neo4j_driver, _qdrant_client
+    if _neo4j_driver:
+        _neo4j_driver.close()
+        _neo4j_driver = None
+    _qdrant_client = None
 
 
 @router.post("/upload", response_model=UploadResponse)
@@ -92,7 +132,6 @@ async def ingest_document_endpoint(
     doc_type: str = "document",
 ):
     try:
-        from app.services.ingestion import ingest_document
 
         content = await file.read()
         content_str = content.decode("utf-8")
@@ -140,8 +179,26 @@ async def gardener_action(action: GardenerAction):
         return {"status": "rejected", "message": "Entity discarded"}
 
     elif action.action == "merge":
-        if action.modified_entity:
-            pass
+        task_data = get_task(task_id)
+        if action.modified_entity and task_data:
+            # Write the merged entity to the knowledge graph
+            try:
+                merged = action.modified_entity
+                entity_name = merged.get("name", task_data.entity_name)
+                entity_type = merged.get("type", "Entity")
+                description = merged.get("description", "")
+
+                driver = _get_neo4j_driver()
+                with driver.session() as session:
+                    session.run(
+                        "MERGE (n:Entity {name: $name}) "
+                        "SET n.description = $description, n.type = $type",
+                        name=entity_name,
+                        description=description,
+                        type=entity_type,
+                    )
+            except Exception as merge_err:
+                logger.error(f"Merge write error: {merge_err}")
         remove_task(task_id)
         return {"status": "merged", "message": "Entity merged and updated"}
 
@@ -154,10 +211,7 @@ async def list_documents(
     limit: int = 50, offset: Optional[str] = None, search: Optional[str] = None
 ):
     try:
-        from qdrant_client import QdrantClient
-        from qdrant_client.models import FieldCondition, Filter, MatchText
-
-        client = QdrantClient(host=settings.qdrant_host, port=settings.qdrant_port)
+        client = _get_qdrant_client()
 
         scroll_filter = None
 
@@ -195,9 +249,7 @@ async def list_documents(
 @router.get("/documents/{doc_id}", response_model=DocumentResponse)
 async def get_document(doc_id: str):
     try:
-        from qdrant_client import QdrantClient
-
-        client = QdrantClient(host=settings.qdrant_host, port=settings.qdrant_port)
+        client = _get_qdrant_client()
 
         try:
             point_id = int(doc_id)
@@ -230,11 +282,8 @@ async def get_document(doc_id: str):
 @router.put("/documents/{doc_id}")
 async def update_document(doc_id: str, request: UpdateDocumentRequest):
     try:
-        from app.llm_factory import get_embedding
-        from qdrant_client import QdrantClient
-        from qdrant_client.models import PointStruct
 
-        client = QdrantClient(host=settings.qdrant_host, port=settings.qdrant_port)
+        client = _get_qdrant_client()
 
         try:
             point_id = int(doc_id)
@@ -277,13 +326,8 @@ async def update_document(doc_id: str, request: UpdateDocumentRequest):
 
 @router.get("/nodes", response_model=List[NodeResponse])
 async def list_nodes(limit: int = 50, offset: int = 0, search: Optional[str] = None):
-    driver = None
     try:
-        from neo4j import GraphDatabase
-
-        driver = GraphDatabase.driver(
-            settings.neo4j_uri, auth=(settings.neo4j_user, settings.neo4j_password)
-        )
+        driver = _get_neo4j_driver()
 
         nodes = []
         with driver.session() as session:
@@ -348,20 +392,12 @@ async def list_nodes(limit: int = 50, offset: int = 0, search: Optional[str] = N
     except Exception as e:
         logger.exception(f"Error listing nodes: {e}")
         raise HTTPException(status_code=500, detail="Internal Server Error")
-    finally:
-        if driver:
-            driver.close()
 
 
 @router.get("/nodes/{node_id}", response_model=NodeResponse)
 async def get_node(node_id: str):
-    driver = None
     try:
-        from neo4j import GraphDatabase
-
-        driver = GraphDatabase.driver(
-            settings.neo4j_uri, auth=(settings.neo4j_user, settings.neo4j_password)
-        )
+        driver = _get_neo4j_driver()
 
         with driver.session() as session:
             result = session.run(
@@ -396,20 +432,12 @@ async def get_node(node_id: str):
     except Exception as e:
         logger.exception(f"Error getting node {node_id}: {e}")
         raise HTTPException(status_code=500, detail="Internal Server Error")
-    finally:
-        if driver:
-            driver.close()
 
 
 @router.put("/nodes/{node_id}")
 async def update_node(node_id: str, request: UpdateNodeRequest):
-    driver = None
     try:
-        from neo4j import GraphDatabase
-
-        driver = GraphDatabase.driver(
-            settings.neo4j_uri, auth=(settings.neo4j_user, settings.neo4j_password)
-        )
+        driver = _get_neo4j_driver()
 
         with driver.session() as session:
             query = ""
@@ -444,6 +472,47 @@ async def update_node(node_id: str, request: UpdateNodeRequest):
     except Exception as e:
         logger.exception(f"Error updating node {node_id}: {e}")
         raise HTTPException(status_code=500, detail="Internal Server Error")
-    finally:
-        if driver:
-            driver.close()
+
+
+@router.delete("/documents/{doc_id}")
+async def delete_document(doc_id: str):
+    try:
+        client = _get_qdrant_client()
+        try:
+            point_id = int(doc_id)
+        except ValueError:
+            point_id = doc_id
+            
+        client.delete(
+            collection_name=settings.qdrant_collection,
+            points_selector=[point_id]
+        )
+        return {"status": "success", "message": f"Document {doc_id} deleted"}
+    except Exception as e:
+        logger.exception(f"Error deleting document {doc_id}: {e}")
+        raise HTTPException(status_code=500, detail="Internal Server Error")
+
+
+@router.delete("/nodes/{node_id}")
+async def delete_node(node_id: str):
+    try:
+        driver = _get_neo4j_driver()
+        with driver.session() as session:
+            if node_id.isdigit():
+                query = """
+                MATCH (n)
+                WHERE elementId(n) = $node_id OR id(n) = $int_id
+                DETACH DELETE n
+                """
+                session.run(query, node_id=node_id, int_id=int(node_id))
+            else:
+                query = """
+                MATCH (n)
+                WHERE elementId(n) = $node_id
+                DETACH DELETE n
+                """
+                session.run(query, node_id=node_id)
+        return {"status": "success", "message": f"Node {node_id} deleted"}
+    except Exception as e:
+        logger.exception(f"Error deleting node {node_id}: {e}")
+        raise HTTPException(status_code=500, detail="Internal Server Error")

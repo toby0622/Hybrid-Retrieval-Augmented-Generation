@@ -1,8 +1,8 @@
 from app.core.config import settings
 from app.core.logger import logger
 from app.llm_factory import get_llm
-from app.skill_registry import get_active_skill
-from app.state import DynamicSlotInfo, GraphState, SlotInfo
+from app.skill_registry import SkillRegistry, get_active_skill
+from app.state import DynamicSlotInfo, GraphState
 from langchain_core.prompts import ChatPromptTemplate
 
 
@@ -94,7 +94,12 @@ async def slot_check_node(state: GraphState) -> GraphState:
     query = state.get("query", "")
     clarification_count = state.get("clarification_count", 0)
 
-    current_skill = get_active_skill()
+    current_skill = None
+    skill_name = state.get("skill")
+    if skill_name:
+        current_skill = SkillRegistry.get_skill(skill_name)
+    if not current_skill:
+        current_skill = get_active_skill()
     if not current_skill:
         return {**state, "clarification_question": None}
 

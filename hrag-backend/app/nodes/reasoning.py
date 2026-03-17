@@ -4,14 +4,14 @@ from typing import List
 from app.core.config import settings
 from app.core.logger import logger
 from app.llm_factory import get_llm
-from app.skill_registry import get_active_skill
+from app.skill_registry import SkillRegistry, get_active_skill
 from app.state import (
     DiagnosticResponse,
     DiagnosticStep,
     DynamicSlotInfo,
     GraphState,
     RetrievalResult,
-    SlotInfo,
+    RetrievalResult,
 )
 from langchain_core.prompts import ChatPromptTemplate
 
@@ -107,16 +107,19 @@ async def reasoning_node(state: GraphState) -> GraphState:
     query = state.get("query", "")
     slots = state.get("slots")
 
-    if isinstance(slots, SlotInfo):
-        slots = slots.to_dynamic()
-    elif slots is None:
+    if slots is None:
         slots = DynamicSlotInfo()
 
     graph_results = state.get("graph_results", [])
     vector_results = state.get("vector_results", [])
     skill_results = state.get("skill_results", [])
 
-    current_skill = get_active_skill()
+    current_skill = None
+    skill_name = state.get("skill")
+    if skill_name:
+        current_skill = SkillRegistry.get_skill(skill_name)
+    if not current_skill:
+        current_skill = get_active_skill()
     if not current_skill:
         return {**state, "response": "System error: No skill initialized."}
 

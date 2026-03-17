@@ -19,19 +19,32 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.exception(f"Skill initialization error: {e}")
     yield
-    # Shutdown (cleanup resources if needed)
+    # Shutdown — cleanup all connections
+    logger.info("Shutting down, cleaning up resources...")
+    try:
+        from app.api.routers.documents import close_document_clients
+        from app.llm_factory import close_embedding_client
+        from app.nodes.retrieval import Neo4jClient, QdrantClientWrapper
+
+        await Neo4jClient.close()
+        QdrantClientWrapper._client = None
+        close_document_clients()
+        await close_embedding_client()
+        logger.info("All resources cleaned up.")
+    except Exception as e:
+        logger.warning(f"Cleanup error (non-fatal): {e}")
 
 
 app = FastAPI(
     title="HRAG Backend API",
     description="Hybrid Retrieval-Augmented Generation API for DevOps Incident Response",
-    version="0.2.0",
+    version="0.3.0",
     lifespan=lifespan,
 )
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],
+    allow_origins=settings.cors_origins_list,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

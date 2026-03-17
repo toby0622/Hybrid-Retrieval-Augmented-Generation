@@ -1,16 +1,32 @@
 import asyncio
+from datetime import date, datetime, time, timedelta
+from decimal import Decimal
 from typing import Any, List, Optional
+from uuid import UUID
+
+from neo4j.time import Date, DateTime, Duration, Time
 
 import httpx
 from app.core.config import settings
 from app.core.logger import logger
+from app.core.utils import sanitize_cypher
 from app.llm_factory import get_embedding, get_llm
 from app.skill_registry import SkillRegistry, get_active_skill
-from app.state import DynamicSlotInfo, GraphState, RetrievalResult, SlotInfo
+from app.state import DynamicSlotInfo, GraphState, RetrievalResult
 from langchain_core.prompts import ChatPromptTemplate
 from neo4j import AsyncGraphDatabase
 from qdrant_client import QdrantClient
 from qdrant_client.models import FieldCondition, Filter, MatchText
+
+
+def _get_skill_from_state(state: GraphState):
+    """Get skill config from state (per-request), fallback to global active."""
+    skill_name = state.get("skill")
+    if skill_name:
+        config = SkillRegistry.get_skill(skill_name)
+        if config:
+            return config
+    return get_active_skill()
 
 EMBEDDING_DIM = settings.embedding_dim
 
@@ -128,7 +144,7 @@ async def graph_search_node(state: GraphState) -> GraphState:
         slots = DynamicSlotInfo()
 
     query = state.get("query", "")
-    current_skill = get_active_skill()
+    current_skill = _get_skill_from_state(state)
 
     if not current_skill:
         return {**state, "graph_results": []}
@@ -150,9 +166,12 @@ async def graph_search_node(state: GraphState) -> GraphState:
                     schema_prompt = current_skill.kg_schema.build_extraction_prompt()
                     if schema_prompt:
                         try:
-                            cypher = await generate_cypher_query(
+                            raw_cypher = await generate_cypher_query(
                                 query, schema_prompt, slots
                             )
+                            cypher = sanitize_cypher(raw_cypher)
+                        except ValueError as sec_err:
+                            logger.warning(f"Cypher security check failed: {sec_err}")
                         except Exception as gen_err:
                             logger.warning(f"Cypher query generation failed: {gen_err}")
 
@@ -202,11 +221,6 @@ async def graph_search_node(state: GraphState) -> GraphState:
 
 
 def _make_serializable(obj: Any) -> Any:
-    from datetime import date, datetime, time, timedelta
-    from decimal import Decimal
-    from uuid import UUID
-
-    from neo4j.time import Date, DateTime, Duration, Time
 
     if isinstance(obj, dict):
         return {k: _make_serializable(v) for k, v in obj.items()}
@@ -233,7 +247,7 @@ async def vector_search_node(state: GraphState) -> GraphState:
     elif slots is None:
         slots = DynamicSlotInfo()
 
-    current_skill = get_active_skill()
+    current_skill = _get_skill_from_state(state)
     results: List[RetrievalResult] = []
 
     try:

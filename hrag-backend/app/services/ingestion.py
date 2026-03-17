@@ -1,16 +1,18 @@
 import json
+import uuid as uuid_mod
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 
 import httpx
 from app.core.config import settings
 from app.core.logger import logger
+from app.core.utils import parse_llm_json, validate_neo4j_label
 from app.llm_factory import get_embedding, get_llm
 from app.skill_registry import SkillRegistry, get_active_skill, list_available_skills, switch_skill
 from langchain_core.prompts import ChatPromptTemplate
 from neo4j import AsyncGraphDatabase
 from qdrant_client import QdrantClient
-from qdrant_client.models import PointStruct
+from qdrant_client.models import Distance, PointStruct, VectorParams
 
 
 @dataclass
@@ -127,26 +129,19 @@ async def extract_entities_with_schema(content: str, schema) -> List[ExtractedEn
         result = await chain.ainvoke({"content": content[:6000]})
         content_str = result.content.strip()
 
-        if not content_str.startswith("["):
-            content_str = "[" + content_str
-
-        if "```" in content_str:
-            content_str = content_str.split("```")[1]
-            if content_str.startswith("json"):
-                content_str = content_str[4:]
-
-        entities_data = json.loads(content_str)
-
+        entities_data = parse_llm_json(content_str, fallback_regex=False, prefix="[")
+        
         entities = []
-        for e in entities_data:
-            entities.append(
-                ExtractedEntity(
-                    name=e.get("name", "Unknown"),
-                    type=e.get("type", "Unknown"),
-                    properties=e.get("properties", {}),
-                    relationships=e.get("relationships", []),
+        if entities_data and isinstance(entities_data, list):
+            for e in entities_data:
+                entities.append(
+                    ExtractedEntity(
+                        name=e.get("name", "Unknown"),
+                        type=e.get("type", "Unknown"),
+                        properties=e.get("properties", {}),
+                        relationships=e.get("relationships", []),
+                    )
                 )
-            )
 
         logger.info(f"Extracted {len(entities)} entities")
         return entities
@@ -167,11 +162,18 @@ async def write_entities_to_neo4j(entities: List[ExtractedEntity]) -> tuple[int,
     try:
         async with driver.session() as session:
             for entity in entities:
+                # Validate label to prevent Cypher injection
+                try:
+                    safe_label = validate_neo4j_label(entity.type)
+                except ValueError as label_err:
+                    logger.warning(f"Skipping entity with invalid label: {label_err}")
+                    continue
+
                 props = {"name": entity.name, **entity.properties}
                 props_str = ", ".join([f"{k}: ${k}" for k in props.keys()])
 
                 query = f"""
-                MERGE (n:{entity.type} {{name: $name}})
+                MERGE (n:{safe_label} {{name: $name}})
                 SET n += {{{props_str}}}
                 RETURN n
                 """
@@ -190,10 +192,19 @@ async def write_entities_to_neo4j(entities: List[ExtractedEntity]) -> tuple[int,
                         )
                         target_type = target_entity.type if target_entity else "Entity"
 
+                        # Validate labels to prevent injection
+                        try:
+                            safe_source_label = validate_neo4j_label(entity.type)
+                            safe_target_label = validate_neo4j_label(target_type)
+                            safe_rel_type = validate_neo4j_label(rel_type)
+                        except ValueError as label_err:
+                            logger.warning(f"Skipping relationship with invalid label: {label_err}")
+                            continue
+
                         query = f"""
-                        MATCH (a:{entity.type} {{name: $source_name}})
-                        MATCH (b:{target_type} {{name: $target_name}})
-                        MERGE (a)-[r:{rel_type}]->(b)
+                        MATCH (a:{safe_source_label} {{name: $source_name}})
+                        MATCH (b:{safe_target_label} {{name: $target_name}})
+                        MERGE (a)-[r:{safe_rel_type}]->(b)
                         RETURN r
                         """
 
@@ -217,15 +228,12 @@ async def write_entities_to_neo4j(entities: List[ExtractedEntity]) -> tuple[int,
 async def write_document_to_qdrant(
     content: str, filename: str, skill: str, doc_type: str = "document"
 ) -> int:
-    import uuid as uuid_mod
-
     client = QdrantClient(host=settings.qdrant_host, port=settings.qdrant_port)
 
     collections = client.get_collections()
     collection_names = [c.name for c in collections.collections]
 
     if settings.qdrant_collection not in collection_names:
-        from qdrant_client.models import Distance, VectorParams
 
         client.create_collection(
             collection_name=settings.qdrant_collection,
@@ -261,7 +269,10 @@ async def write_document_to_qdrant(
     return len(points)
 
 
-def _chunk_document(content: str, max_chunk_size: int = 1000) -> List[str]:
+def _chunk_document(
+    content: str, max_chunk_size: int = 1000, chunk_overlap: int = 200
+) -> List[str]:
+    """Split document into chunks with configurable overlap."""
     paragraphs = content.split("\n\n")
 
     chunks = []
@@ -277,7 +288,14 @@ def _chunk_document(content: str, max_chunk_size: int = 1000) -> List[str]:
         else:
             if current_chunk:
                 chunks.append(current_chunk.strip())
-            current_chunk = para + "\n\n"
+                # Keep overlap from end of previous chunk
+                if chunk_overlap > 0:
+                    overlap_text = current_chunk.strip()[-chunk_overlap:]
+                    current_chunk = overlap_text + "\n\n" + para + "\n\n"
+                else:
+                    current_chunk = para + "\n\n"
+            else:
+                current_chunk = para + "\n\n"
 
     if current_chunk:
         chunks.append(current_chunk.strip())

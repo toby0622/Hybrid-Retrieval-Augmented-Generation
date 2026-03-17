@@ -43,43 +43,6 @@ class DynamicSlotInfo(BaseModel):
         return "\n".join(parts) if parts else "No specific details provided yet."
 
 
-class SlotInfo(BaseModel):
-    service_name: Optional[str] = None
-    error_type: Optional[str] = None
-    timestamp: Optional[str] = None
-    environment: Optional[str] = None
-    cluster: Optional[str] = None
-    additional_context: Optional[str] = None
-
-    def is_sufficient(self) -> bool:
-        return bool(self.service_name or self.error_type)
-
-    def get_missing_slots(self) -> List[str]:
-        missing = []
-        if not self.service_name:
-            missing.append("service_name")
-        if not self.error_type:
-            missing.append("error_type")
-        if not self.timestamp:
-            missing.append("timestamp")
-        return missing
-
-    def to_dynamic(self) -> DynamicSlotInfo:
-        dynamic = DynamicSlotInfo()
-        dynamic.slots = {
-            "service_name": self.service_name,
-            "error_type": self.error_type,
-            "timestamp": self.timestamp,
-            "environment": self.environment,
-            "cluster": self.cluster,
-            "additional_context": self.additional_context,
-        }
-        dynamic.configure(
-            required=["service_name", "error_type"],
-            optional=["timestamp", "environment", "cluster", "additional_context"],
-        )
-        return dynamic
-
 
 class RetrievalResult(BaseModel):
     source: Literal["graph", "vector", "skill"]
@@ -122,7 +85,7 @@ class GraphState(TypedDict, total=False):
 
     intent: str
 
-    slots: Union[SlotInfo, DynamicSlotInfo]
+    slots: DynamicSlotInfo
     clarification_question: Optional[str]
     clarification_count: int
 

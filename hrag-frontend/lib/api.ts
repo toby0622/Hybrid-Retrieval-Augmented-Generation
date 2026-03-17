@@ -89,7 +89,7 @@ export interface HealthResponse {
 
 export interface IngestResponse {
   file_name: string;
-  domain: string;
+  skill: string;
   status: string;
   entities_created: number;
   relations_created: number;
@@ -103,7 +103,7 @@ export interface DocumentChunk {
   metadata: {
     title?: string;
     doc_type?: string;
-    domain?: string;
+    skill?: string;
     chunk_index?: number;
     [key: string]: unknown;
   };

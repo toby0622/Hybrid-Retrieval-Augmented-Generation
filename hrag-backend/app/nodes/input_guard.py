@@ -1,11 +1,13 @@
 import json
+import re
 from typing import Literal, Optional
 
 from app.core.config import settings
 from app.core.logger import logger
+from app.core.utils import parse_llm_json
 from app.llm_factory import get_llm
-from app.skill_registry import SkillRegistry, get_active_skill, list_available_skills, switch_skill
-from app.state import DynamicSlotInfo, GraphState, SlotInfo
+from app.skill_registry import SkillRegistry, get_active_skill, list_available_skills
+from app.state import DynamicSlotInfo, GraphState
 from langchain_core.prompts import ChatPromptTemplate
 
 
@@ -247,9 +249,6 @@ async def input_guard_node(state: GraphState) -> GraphState:
             extraction_chain = extraction_prompt | llm
 
             existing_slots = state.get("slots")
-            if isinstance(existing_slots, SlotInfo):
-                existing_slots = existing_slots.to_dynamic()
-
             original_query = state.get("original_query", "")
             prev_clarification = state.get("clarification_question", "")
 
@@ -320,10 +319,9 @@ User answered: {clarification_response}"""
             }
 
     detected_skill = await _detect_skill_async(query)
-    if detected_skill:
-        switch_skill(detected_skill)
+    skill_name = detected_skill or SkillRegistry.get_active_name()
 
-    current_skill = get_active_skill()
+    current_skill = SkillRegistry.get_skill(skill_name) if skill_name else get_active_skill()
 
     if not current_skill:
         logger.error("No active skill loaded!")
@@ -400,7 +398,7 @@ User answered: {clarification_response}"""
 
     return {
         **state,
-        "skill": current_skill.name,
+        "skill": skill_name,
         "intent": matched_intent,
         "slots": slots,
         "clarification_count": state.get("clarification_count", 0),

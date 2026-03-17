@@ -1,7 +1,7 @@
 from app.core.config import settings
 from app.core.logger import logger
 from app.llm_factory import get_llm
-from app.skill_registry import get_active_skill
+from app.skill_registry import SkillRegistry, get_active_skill
 from app.state import DiagnosticResponse, GraphState, Message
 from langchain_core.prompts import ChatPromptTemplate
 
@@ -56,7 +56,12 @@ Do NOT use Pinyin in Chinese responses.
 
 async def chat_response_node(state: GraphState) -> GraphState:
     query = state.get("query", "")
-    current_skill = get_active_skill()
+    current_skill = None
+    skill_name = state.get("skill")
+    if skill_name:
+        current_skill = SkillRegistry.get_skill(skill_name)
+    if not current_skill:
+        current_skill = get_active_skill()
 
     if not current_skill:
         return {**state, "response": "System error: No skill initialized."}
@@ -93,7 +98,12 @@ async def clarification_response_node(state: GraphState) -> GraphState:
 async def diagnostic_response_node(state: GraphState) -> GraphState:
     diagnostic = state.get("diagnostic")
 
-    current_skill = get_active_skill()
+    current_skill = None
+    skill_name = state.get("skill")
+    if skill_name:
+        current_skill = SkillRegistry.get_skill(skill_name)
+    if not current_skill:
+        current_skill = get_active_skill()
     lang = current_skill.response_language if current_skill else "English"
 
     if not diagnostic:
@@ -118,7 +128,12 @@ async def diagnostic_response_node(state: GraphState) -> GraphState:
 
 
 async def end_conversation_node(state: GraphState) -> GraphState:
-    current_skill = get_active_skill()
+    current_skill = None
+    skill_name = state.get("skill")
+    if skill_name:
+        current_skill = SkillRegistry.get_skill(skill_name)
+    if not current_skill:
+        current_skill = get_active_skill()
     name = current_skill.display_name if current_skill else "the system"
 
     goodbye_msg = f"Thank you for using {name}. The conversation has ended. Feel free to start a new conversation anytime!"

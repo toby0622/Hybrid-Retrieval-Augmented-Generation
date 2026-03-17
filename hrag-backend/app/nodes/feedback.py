@@ -1,8 +1,10 @@
 from typing import Any, Dict, List
 
+import numpy as np
 from app.core.config import settings
-from app.llm_factory import get_llm
-from app.state import GraphState, SlotInfo
+from app.llm_factory import get_embedding, get_llm
+from app.state import GraphState
+from app.core.utils import parse_llm_json
 from langchain_core.prompts import ChatPromptTemplate
 
 CASE_STUDY_PROMPT = ChatPromptTemplate.from_messages(
@@ -103,7 +105,9 @@ async def _generate_case_study(state: GraphState) -> GraphState:
     from app.services.ingestion import ingest_document
     from app.state import DynamicSlotInfo
 
-    slots = state.get("slots", SlotInfo())
+    slots = state.get("slots")
+    if slots is None:
+        slots = DynamicSlotInfo()
     diagnostic = state.get("diagnostic")
     query = state.get("query", "")
 
@@ -114,16 +118,8 @@ async def _generate_case_study(state: GraphState) -> GraphState:
             "response": "Cannot generate case study: No diagnostic analysis found.",
         }
 
-    # Handle both SlotInfo and DynamicSlotInfo
-    if isinstance(slots, DynamicSlotInfo):
-        service = slots.get_slot("service_name") or "Unknown"
-        error_type = slots.get_slot("error_type") or "Unknown"
-    elif isinstance(slots, SlotInfo):
-        service = slots.service_name or "Unknown"
-        error_type = slots.error_type or "Unknown"
-    else:
-        service = "Unknown"
-        error_type = "Unknown"
+    service = slots.get_slot("service_name") or "Unknown"
+    error_type = slots.get_slot("error_type") or "Unknown"
 
     diagnostic_summary = "\n".join(
         [f"- {step.title}: {step.detail}" for step in diagnostic.path]
@@ -149,7 +145,7 @@ async def _generate_case_study(state: GraphState) -> GraphState:
             doc_type="case_study",
         )
 
-        success_msg = f"\n\n**Case Study Generated and Archived**\n- Domain: {ingest_result.domain}\n- Entities: {ingest_result.entities_created}\n- Status: {'success' if ingest_result.success else 'partial'}"
+        success_msg = f"\n\n**Case Study Generated and Archived**\n- Skill: {ingest_result.skill}\n- Entities: {ingest_result.entities_created}\n- Status: {'success' if ingest_result.success else 'partial'}"
 
         return {
             **state,
@@ -287,20 +283,9 @@ async def extract_entities_node(content: str) -> List[Dict[str, Any]]:
         chain = ENTITY_EXTRACTION_PROMPT | llm
         result = await chain.ainvoke({"content": content[:4000]})
 
-        import json
-
         content_str = result.content.strip()
-
-        if not content_str.startswith("["):
-            content_str = "[" + content_str
-
-        if "```" in content_str:
-            content_str = content_str.split("```")[1]
-            if content_str.startswith("json"):
-                content_str = content_str[4:]
-
-        entities = json.loads(content_str)
-        return entities
+        entities = parse_llm_json(content_str, fallback_regex=False, prefix="[")
+        return entities if isinstance(entities, list) else []
 
     except Exception as e:
         print(f"Entity extraction error: {e}")
@@ -337,8 +322,6 @@ async def check_entity_conflicts(
 
 
 async def _compute_embedding_similarity(text1: str, text2: str) -> float:
-    import numpy as np
-    from app.nodes.retrieval import get_embedding
 
     embedding1 = await get_embedding(text1)
     embedding2 = await get_embedding(text2)
