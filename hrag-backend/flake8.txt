@@ -1,0 +1,63 @@
+app/api\routers\documents.py:22:1: F401 'app.services.gardener.gardener_tasks' imported but unused
+app/api\routers\documents.py:30:1: F401 'neo4j.GraphDatabase' imported but unused
+app/api\routers\documents.py:31:1: F401 'qdrant_client.QdrantClient' imported but unused
+app/api\routers\documents.py:308:30: W291 trailing whitespace
+app/api\routers\documents.py:310:50: W291 trailing whitespace
+app/api\routers\documents.py:311:33: W291 trailing whitespace
+app/api\routers\documents.py:336:30: W291 trailing whitespace
+app/api\routers\documents.py:338:43: W291 trailing whitespace
+app/api\routers\documents.py:339:33: W291 trailing whitespace
+app/api\routers\documents.py:456:1: W293 blank line contains whitespace
+app/core\config.py:1:1: F401 'typing.Optional' imported but unused
+app/core\config.py:19:5: E303 too many blank lines (2)
+app/core\db.py:8:1: E302 expected 2 blank lines, found 1
+app/core\db.py:17:1: E302 expected 2 blank lines, found 1
+app/core\db.py:26:1: E302 expected 2 blank lines, found 1
+app/graph.py:84:1: E302 expected 2 blank lines, found 1
+app/main.py:4:1: F401 'fastapi.HTTPException' imported but unused
+app/main.py:11:1: F811 redefinition of unused 'FastAPI' from line 4
+app/main.py:12:1: F811 redefinition of unused 'CORSMiddleware' from line 6
+app/main.py:50:1: E302 expected 2 blank lines, found 1
+app/main.py:59:1: W293 blank line contains whitespace
+app/nodes\__init__.py:1:1: W391 blank line at end of file
+app/nodes\feedback.py:4:1: F401 'app.core.config.settings' imported but unused
+app/nodes\input_guard.py:2:1: F401 're' imported but unused
+app/nodes\input_guard.py:3:1: F401 'typing.Literal' imported but unused
+app/nodes\input_guard.py:5:1: F401 'app.core.config.settings' imported but unused
+app/nodes\input_guard.py:7:1: F401 'app.core.utils.parse_llm_json' imported but unused
+app/nodes\input_guard.py:298:17: F811 redefinition of unused 're' from line 2
+app/nodes\reasoning.py:4:1: F401 'app.core.config.settings' imported but unused
+app/nodes\reasoning.py:8:1: F811 redefinition of unused 'RetrievalResult' from line 8
+app/nodes\reasoning.py:8:1: F401 'app.state.RetrievalResult' imported but unused
+app/nodes\reasoning.py:38:1: W293 blank line contains whitespace
+app/nodes\reasoning.py:42:1: W293 blank line contains whitespace
+app/nodes\reasoning.py:74:1: W293 blank line contains whitespace
+app/nodes\reasoning.py:86:1: W293 blank line contains whitespace
+app/nodes\reasoning.py:161:5: E303 too many blank lines (2)
+app/nodes\reasoning.py:274:14: E111 indentation is not a multiple of 4
+app/nodes\reasoning.py:274:14: E117 over-indented
+app/nodes\reasoning.py:275:17: E121 continuation line under-indented for hanging indent
+app/nodes\reasoning.py:276:13: E122 continuation line missing indentation or outdented
+app/nodes\reasoning.py:283:24: F541 f-string is missing placeholders
+app/nodes\response.py:1:1: F401 'app.core.config.settings' imported but unused
+app/nodes\response.py:5:1: F401 'app.state.DiagnosticResponse' imported but unused
+app/nodes\response.py:5:1: F401 'app.state.Message' imported but unused
+app/nodes\response.py:119:31: F541 f-string is missing placeholders
+app/nodes\response.py:122:13: F541 f-string is missing placeholders
+app/nodes\retrieval.py:4:1: F401 'typing.Optional' imported but unused
+app/nodes\retrieval.py:9:1: F401 'httpx' imported but unused
+app/nodes\retrieval.py:30:1: E305 expected 2 blank lines after class or function definition, found 1
+app/nodes\retrieval.py:288:1: W293 blank line contains whitespace
+app/nodes\retrieval.py:291:1: W293 blank line contains whitespace
+app/nodes\retrieval.py:309:1: W293 blank line contains whitespace
+app/nodes\slot_filling.py:1:1: F401 'app.core.config.settings' imported but unused
+app/nodes\slot_filling.py:89:26: F821 undefined name 'SlotInfo'
+app/services\ingestion.py:1:1: F401 'json' imported but unused
+app/services\ingestion.py:4:1: F401 'typing.Optional' imported but unused
+app/services\ingestion.py:6:1: F401 'httpx' imported but unused
+app/services\ingestion.py:12:1: F401 'app.skill_registry.get_active_skill' imported but unused
+app/skill_config.py:14:1: F401 'dataclasses.dataclass' imported but unused
+app/skill_config.py:14:1: F401 'dataclasses.field' imported but unused
+app/skill_registry.py:11:1: F401 'typing.Type' imported but unused
+app/state.py:1:1: F401 'typing.Union' imported but unused
+app/state.py:47:1: E303 too many blank lines (3)

@@ -5,7 +5,9 @@ from qdrant_client.models import FieldCondition, Filter, MatchText, PointStruct
 from app.services.ingestion import ingest_document
 
 from app.core.config import settings
+from app.core.db import get_neo4j_driver, get_qdrant_client
 from app.core.logger import logger
+from app.llm_factory import get_embedding
 from app.core.utils import serialize_neo4j_properties
 from app.nodes.feedback import check_entity_conflicts, extract_entities_node
 from app.schemas.common import EntityConflict, GardenerAction, GardenerTask
@@ -19,51 +21,17 @@ from app.schemas.documents import (
 )
 from app.services.gardener import (
     add_task,
-    gardener_tasks,
     get_all_tasks,
     get_task,
     remove_task,
 )
 from fastapi import APIRouter, BackgroundTasks, File, HTTPException, UploadFile
-from neo4j import GraphDatabase
-from qdrant_client import QdrantClient
 
 router = APIRouter()
 
 
 # ─── Shared DB clients (singletons) ───
-
-_neo4j_driver = None
-_qdrant_client = None
-
-
-def _get_neo4j_driver():
-    """Get or create a shared sync Neo4j driver."""
-    global _neo4j_driver
-    if _neo4j_driver is None:
-        _neo4j_driver = GraphDatabase.driver(
-            settings.neo4j_uri, auth=(settings.neo4j_user, settings.neo4j_password)
-        )
-    return _neo4j_driver
-
-
-def _get_qdrant_client():
-    """Get or create a shared Qdrant client."""
-    global _qdrant_client
-    if _qdrant_client is None:
-        _qdrant_client = QdrantClient(
-            host=settings.qdrant_host, port=settings.qdrant_port
-        )
-    return _qdrant_client
-
-
-def close_document_clients():
-    """Cleanup DB clients on shutdown."""
-    global _neo4j_driver, _qdrant_client
-    if _neo4j_driver:
-        _neo4j_driver.close()
-        _neo4j_driver = None
-    _qdrant_client = None
+# Now imported from app.core.db
 
 
 @router.post("/upload", response_model=UploadResponse)
@@ -188,7 +156,7 @@ async def gardener_action(action: GardenerAction):
                 entity_type = merged.get("type", "Entity")
                 description = merged.get("description", "")
 
-                driver = _get_neo4j_driver()
+                driver = get_neo4j_driver()
                 with driver.session() as session:
                     session.run(
                         "MERGE (n:Entity {name: $name}) "
@@ -211,7 +179,7 @@ async def list_documents(
     limit: int = 50, offset: Optional[str] = None, search: Optional[str] = None
 ):
     try:
-        client = _get_qdrant_client()
+        client = get_qdrant_client()
 
         scroll_filter = None
 
@@ -249,7 +217,7 @@ async def list_documents(
 @router.get("/documents/{doc_id}", response_model=DocumentResponse)
 async def get_document(doc_id: str):
     try:
-        client = _get_qdrant_client()
+        client = get_qdrant_client()
 
         try:
             point_id = int(doc_id)
@@ -283,7 +251,7 @@ async def get_document(doc_id: str):
 async def update_document(doc_id: str, request: UpdateDocumentRequest):
     try:
 
-        client = _get_qdrant_client()
+        client = get_qdrant_client()
 
         try:
             point_id = int(doc_id)
@@ -327,17 +295,17 @@ async def update_document(doc_id: str, request: UpdateDocumentRequest):
 @router.get("/nodes", response_model=List[NodeResponse])
 async def list_nodes(limit: int = 50, offset: int = 0, search: Optional[str] = None):
     try:
-        driver = _get_neo4j_driver()
+        driver = get_neo4j_driver()
 
         nodes = []
         with driver.session() as session:
             try:
                 if search:
                     query = """
-                    MATCH (n) 
+                    MATCH (n)
                     WHERE toLower(n.name) CONTAINS toLower($search)
-                    RETURN n, elementId(n) as eid 
-                    ORDER BY eid 
+                    RETURN n, elementId(n) as eid
+                    ORDER BY eid
                     SKIP $img_offset LIMIT $img_limit
                     """
                     result = session.run(
@@ -362,10 +330,10 @@ async def list_nodes(limit: int = 50, offset: int = 0, search: Optional[str] = N
             except Exception:
                 if search:
                     query = """
-                    MATCH (n) 
+                    MATCH (n)
                     WHERE toLower(n.name) CONTAINS toLower($search)
-                    RETURN n, id(n) as nid 
-                    ORDER BY nid 
+                    RETURN n, id(n) as nid
+                    ORDER BY nid
                     SKIP $img_offset LIMIT $img_limit
                     """
                     result = session.run(
@@ -397,7 +365,7 @@ async def list_nodes(limit: int = 50, offset: int = 0, search: Optional[str] = N
 @router.get("/nodes/{node_id}", response_model=NodeResponse)
 async def get_node(node_id: str):
     try:
-        driver = _get_neo4j_driver()
+        driver = get_neo4j_driver()
 
         with driver.session() as session:
             result = session.run(
@@ -437,7 +405,7 @@ async def get_node(node_id: str):
 @router.put("/nodes/{node_id}")
 async def update_node(node_id: str, request: UpdateNodeRequest):
     try:
-        driver = _get_neo4j_driver()
+        driver = get_neo4j_driver()
 
         with driver.session() as session:
             query = ""
@@ -477,12 +445,11 @@ async def update_node(node_id: str, request: UpdateNodeRequest):
 @router.delete("/documents/{doc_id}")
 async def delete_document(doc_id: str):
     try:
-        client = _get_qdrant_client()
+        client = get_qdrant_client()
         try:
             point_id = int(doc_id)
         except ValueError:
             point_id = doc_id
-            
         client.delete(
             collection_name=settings.qdrant_collection,
             points_selector=[point_id]
@@ -496,7 +463,7 @@ async def delete_document(doc_id: str):
 @router.delete("/nodes/{node_id}")
 async def delete_node(node_id: str):
     try:
-        driver = _get_neo4j_driver()
+        driver = get_neo4j_driver()
         with driver.session() as session:
             if node_id.isdigit():
                 query = """

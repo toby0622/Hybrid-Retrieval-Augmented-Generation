@@ -1,8 +1,16 @@
 import { useState, useEffect } from 'react';
-import { Network, Edit2, X, Loader2, Search } from 'lucide-react';
+import { Network, Edit2, X, Loader2, Search, List, Activity } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { apiClient, NodeEntity } from '@/lib/api';
 import { NodeEditor } from '@/components/knowledge/node-editor';
+import dynamic from 'next/dynamic';
+
+const ForceGraph2D = dynamic(() => import('react-force-graph-2d'), { ssr: false });
+
+interface GraphData {
+  nodes: { id: string; name: string; val: number; color?: string; labels: string[] }[];
+  links: { source: string; target: string; type?: string }[];
+}
 
 interface NodeBrowserProps {
   isOpen: boolean;
@@ -16,6 +24,8 @@ export function NodeBrowser({ isOpen, onClose, addToast }: NodeBrowserProps) {
   const [offset, setOffset] = useState(0);
   const [selectedNode, setSelectedNode] = useState<NodeEntity | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [viewMode, setViewMode] = useState<'list' | 'graph'>('list');
+  const [graphData, setGraphData] = useState<GraphData>({ nodes: [], links: [] });
 
   const loadNodes = async (reset = false, searchTerm?: string) => {
     setIsLoading(true);
@@ -39,9 +49,39 @@ export function NodeBrowser({ isOpen, onClose, addToast }: NodeBrowserProps) {
 
   useEffect(() => {
     if (isOpen) {
-      loadNodes(true, searchQuery);
+      if (viewMode === 'list') {
+        loadNodes(true, searchQuery);
+      } else {
+        loadGraphData();
+      }
     }
-  }, [isOpen]);
+  }, [isOpen, viewMode]);
+
+  const loadGraphData = async () => {
+    setIsLoading(true);
+    try {
+      const fetchedNodes = await apiClient.getNodes(500, 0); // Need a lot of nodes for graph
+      
+      const gData: GraphData = {
+        nodes: fetchedNodes.map(n => ({
+          id: n.id,
+          name: typeof n.properties.name === 'string' ? n.properties.name : n.id,
+          val: 1, // Node size
+          labels: n.labels,
+          color: n.labels.includes('Service') ? '#3b82f6' : 
+                 n.labels.includes('Database') ? '#10b981' : 
+                 n.labels.includes('Error') ? '#ef4444' : '#8b5cf6'
+        })),
+        links: [] // Edges fetching requires a new API endpoint, skipping edges for this simple demo or falling back to isolated nodes
+      };
+      
+      setGraphData(gData);
+    } catch (e) {
+      addToast('Failed to load graph data', 'error');
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const handleEdit = (node: NodeEntity) => {
     setSelectedNode(node);
@@ -92,24 +132,42 @@ export function NodeBrowser({ isOpen, onClose, addToast }: NodeBrowserProps) {
             </button>
           </div>
           
-          <div className="flex-1 overflow-y-auto p-4 space-y-3 scrollbar-thin scrollbar-thumb-slate-700">
-            {isLoading && nodes.length === 0 ? (
-              <div className="flex flex-col items-center justify-center h-full text-slate-500">
+          <div className="flex border-b border-slate-800 bg-slate-900/80 p-2 gap-2">
+            <button
+               onClick={() => setViewMode('list')}
+               className={`flex-1 py-1.5 px-3 rounded text-sm font-medium flex items-center justify-center gap-2 transition-colors ${viewMode === 'list' ? 'bg-slate-800 text-white shadow-sm' : 'text-slate-400 hover:bg-slate-800/50 hover:text-slate-200'}`}
+            >
+               <List className="w-4 h-4" /> List View
+            </button>
+            <button
+               onClick={() => setViewMode('graph')}
+               className={`flex-1 py-1.5 px-3 rounded text-sm font-medium flex items-center justify-center gap-2 transition-colors ${viewMode === 'graph' ? 'bg-slate-800 text-white shadow-sm' : 'text-slate-400 hover:bg-slate-800/50 hover:text-slate-200'}`}
+            >
+               <Activity className="w-4 h-4" /> Graph View
+            </button>
+          </div>
+          
+          <div className="flex-1 overflow-y-auto p-4 space-y-3 scrollbar-thin scrollbar-thumb-slate-700 relative">
+            {isLoading && ((viewMode === 'list' && nodes.length === 0) || (viewMode === 'graph' && graphData.nodes.length === 0)) ? (
+              <div className="flex flex-col items-center justify-center h-full text-slate-500 absolute inset-0 z-10 bg-slate-900/50">
                 <Loader2 className="w-8 h-8 animate-spin mb-2" />
                 <p>Loading nodes...</p>
               </div>
-            ) : nodes.length === 0 ? (
+            ) : null}
+            
+            {viewMode === 'list' ? (
+              nodes.length === 0 && !isLoading ? (
                 <div className="flex flex-col items-center justify-center h-full text-slate-500">
                     <p>No nodes found in the graph.</p>
                 </div>
-            ) : (
-              nodes.map((node) => (
+              ) : (
+              nodes.map((node: NodeEntity) => (
                 <Card key={node.id} className="hover:border-slate-600 transition-all group border-slate-800 bg-slate-950/50">
                   <CardContent className="p-4 flex items-start gap-4">
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-2">
                         <span className="text-xs font-mono text-slate-500">ID: {node.id}</span>
-                        {node.labels.map(label => (
+                        {node.labels.map((label: string) => (
                           <span key={label} className="text-xs px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/30">
                             {label}
                           </span>
@@ -134,20 +192,40 @@ export function NodeBrowser({ isOpen, onClose, addToast }: NodeBrowserProps) {
                     </button>
                   </CardContent>
                 </Card>
-              ))
+              )))
+            ) : (
+                <div className="h-full w-full inset-0 absolute overflow-hidden rounded-lg bg-slate-950">
+                    {graphData.nodes.length > 0 && typeof window !== 'undefined' && (
+                        <ForceGraph2D
+                          graphData={graphData}
+                          nodeLabel="name"
+                          nodeColor="color"
+                          nodeRelSize={6}
+                          width={800}
+                          height={500}
+                          backgroundColor="#020617" // slate-950
+                          onNodeClick={(node) => {
+                             const fullNode = nodes.find((n: NodeEntity) => n.id === (node as { id: string }).id);
+                             if (fullNode) handleEdit(fullNode);
+                          }}
+                        />
+                    )}
+                </div>
             )}
           </div>
           
-          <div className="p-4 border-t border-slate-800 bg-slate-900/50 rounded-b-xl flex justify-between items-center text-xs text-slate-500">
-            <div>Showing {nodes.length} nodes</div>
-            <button 
-                onClick={() => loadNodes(false, searchQuery)} 
-                disabled={isLoading}
-                className="hover:text-purple-400 transition-colors disabled:opacity-50"
-            >
-                {isLoading ? 'Loading...' : 'Load More'}
-            </button>
-          </div>
+          {viewMode === 'list' && (
+            <div className="p-4 border-t border-slate-800 bg-slate-900/50 rounded-b-xl flex justify-between items-center text-xs text-slate-500">
+              <div>Showing {nodes.length} nodes</div>
+              <button 
+                  onClick={() => loadNodes(false, searchQuery)} 
+                  disabled={isLoading}
+                  className="hover:text-purple-400 transition-colors disabled:opacity-50"
+              >
+                  {isLoading ? 'Loading...' : 'Load More'}
+              </button>
+            </div>
+          )}
         </div>
       )}
     </div>

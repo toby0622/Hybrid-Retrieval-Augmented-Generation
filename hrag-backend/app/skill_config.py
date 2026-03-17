@@ -11,7 +11,6 @@ Each skill is a self-contained package that defines:
 - Optional executable handler code
 """
 
-from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 

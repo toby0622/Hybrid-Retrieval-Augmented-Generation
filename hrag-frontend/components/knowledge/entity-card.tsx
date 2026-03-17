@@ -6,7 +6,7 @@ import { GardenerTask } from '@/types';
 
 interface EntityCardProps {
   task: GardenerTask;
-  onResolve: (id: number, action: 'approve' | 'reject') => void;
+  onResolve: (id: string, action: 'approve' | 'reject') => void;
 }
 
 export function EntityCard({ task, onResolve }: EntityCardProps) {
@@ -18,7 +18,7 @@ export function EntityCard({ task, onResolve }: EntityCardProps) {
             {task.type === 'conflict' ? <GitMerge className="w-4 h-4" /> : <Search className="w-4 h-4" />}
           </div>
           <div>
-            <div className="text-sm font-bold text-slate-200">{task.entityName}</div>
+            <div className="text-sm font-bold text-slate-200">{task.entity_name}</div>
             <div className="text-xs text-slate-500 flex items-center gap-1">
               Source: {task.source} • <span className="text-blue-400">{(task.confidence * 100).toFixed(0)}% Similarity</span>
             </div>
@@ -29,24 +29,24 @@ export function EntityCard({ task, onResolve }: EntityCardProps) {
         </div>
       </div>
 
-      {task.type === 'conflict' && task.existingEntity && task.newEntity && (
+      {task.type === 'conflict' && task.existing_entity && task.new_entity && (
         <div className="grid grid-cols-2 gap-4 bg-slate-900/50 rounded p-3 text-xs border border-slate-700/50">
           <div>
             <div className="text-slate-500 mb-1">Existing in Graph</div>
-            <div className="font-semibold text-slate-300">{task.existingEntity.name}</div>
-            <div className="text-slate-400 mt-1 line-clamp-2">{task.existingEntity.desc}</div>
+            <div className="font-semibold text-slate-300">{task.existing_entity.name}</div>
+            <div className="text-slate-400 mt-1 line-clamp-2">{task.existing_entity.description}</div>
           </div>
           <div className="border-l border-slate-700 pl-4">
             <div className="text-slate-500 mb-1">Extracted from New Doc</div>
-            <div className="font-semibold text-slate-300">{task.newEntity.name}</div>
-            <div className="text-emerald-400/80 mt-1 line-clamp-2">{task.newEntity.desc}</div>
+            <div className="font-semibold text-slate-300">{task.new_entity.name}</div>
+            <div className="text-emerald-400/80 mt-1 line-clamp-2">{task.new_entity.description}</div>
           </div>
         </div>
       )}
 
-      {task.type === 'new' && task.desc && (
+      {task.type === 'new' && task.description && (
         <div className="text-xs text-slate-400 bg-slate-900/50 p-3 rounded border border-slate-700/50">
-          {task.desc}
+          {task.description}
         </div>
       )}
 

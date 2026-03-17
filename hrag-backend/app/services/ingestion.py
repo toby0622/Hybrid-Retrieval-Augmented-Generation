@@ -1,17 +1,14 @@
-import json
 import uuid as uuid_mod
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
-import httpx
 from app.core.config import settings
+from app.core.db import get_neo4j_driver, get_qdrant_client
 from app.core.logger import logger
 from app.core.utils import parse_llm_json, validate_neo4j_label
 from app.llm_factory import get_embedding, get_llm
-from app.skill_registry import SkillRegistry, get_active_skill, list_available_skills, switch_skill
+from app.skill_registry import SkillRegistry, list_available_skills, switch_skill
 from langchain_core.prompts import ChatPromptTemplate
-from neo4j import AsyncGraphDatabase
-from qdrant_client import QdrantClient
 from qdrant_client.models import Distance, PointStruct, VectorParams
 
 
@@ -130,7 +127,6 @@ async def extract_entities_with_schema(content: str, schema) -> List[ExtractedEn
         content_str = result.content.strip()
 
         entities_data = parse_llm_json(content_str, fallback_regex=False, prefix="[")
-        
         entities = []
         if entities_data and isinstance(entities_data, list):
             for e in entities_data:
@@ -155,9 +151,7 @@ async def write_entities_to_neo4j(entities: List[ExtractedEntity]) -> tuple[int,
     nodes_created = 0
     rels_created = 0
 
-    driver = AsyncGraphDatabase.driver(
-        settings.neo4j_uri, auth=(settings.neo4j_user, settings.neo4j_password)
-    )
+    driver = get_neo4j_driver()
 
     try:
         async with driver.session() as session:
@@ -219,8 +213,7 @@ async def write_entities_to_neo4j(entities: List[ExtractedEntity]) -> tuple[int,
     except Exception as e:
         logger.error(f"Neo4j write error: {e}")
         raise e
-    finally:
-        await driver.close()
+        # We don't close the shared Sync driver here, it's managed by db.py
 
     return nodes_created, rels_created
 
@@ -228,7 +221,7 @@ async def write_entities_to_neo4j(entities: List[ExtractedEntity]) -> tuple[int,
 async def write_document_to_qdrant(
     content: str, filename: str, skill: str, doc_type: str = "document"
 ) -> int:
-    client = QdrantClient(host=settings.qdrant_host, port=settings.qdrant_port)
+    client = get_qdrant_client()
 
     collections = client.get_collections()
     collection_names = [c.name for c in collections.collections]

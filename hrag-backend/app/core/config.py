@@ -1,4 +1,4 @@
-from typing import List, Optional
+from typing import List
 
 from pydantic_settings import BaseSettings
 
@@ -14,7 +14,6 @@ class Settings(BaseSettings):
     embedding_api_key: str = ""
     embedding_model_name: str = ""
     embedding_dim: int = 768
-
 
     neo4j_uri: str = ""
     neo4j_user: str = ""

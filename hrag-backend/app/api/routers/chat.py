@@ -77,7 +77,7 @@ async def chat_stream(request: ChatRequest):
 
             yield f"data: {json.dumps(response_data)}\n\n"
 
-        except Exception as e:
+        except Exception:
             logger.exception("Error in chat stream generation")
             yield f"data: {json.dumps({'type': 'error', 'message': 'Internal Server Error'})}\n\n"
 

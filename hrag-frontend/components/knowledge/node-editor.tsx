@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { Save, X, Trash2, Plus } from 'lucide-react';
 import { apiClient, NodeEntity } from '@/lib/api';
-import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 
 interface NodeEditorProps {

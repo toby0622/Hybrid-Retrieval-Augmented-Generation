@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Search, Edit2, ChevronLeft, ChevronRight, X, Loader2 } from 'lucide-react';
+import { Search, Edit2, X, Loader2 } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { apiClient, DocumentChunk } from '@/lib/api';
 import { DocumentEditor } from '@/components/knowledge/document-editor';
@@ -15,7 +15,6 @@ export function DocumentBrowser({ isOpen, onClose, addToast }: DocumentBrowserPr
   const [isLoading, setIsLoading] = useState(false);
   const [offset, setOffset] = useState<string | undefined>(undefined);
   const [selectedDoc, setSelectedDoc] = useState<DocumentChunk | null>(null);
-  const [pageHistory, setPageHistory] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   
   const loadDocuments = async (nextOffset?: string, searchTerm?: string) => {

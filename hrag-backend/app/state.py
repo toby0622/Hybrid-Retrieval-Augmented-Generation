@@ -1,4 +1,4 @@
-from typing import Any, Dict, List, Literal, Optional, TypedDict, Union
+from typing import Any, Dict, List, Literal, Optional, TypedDict
 
 from pydantic import BaseModel, ConfigDict, Field, PrivateAttr
 
@@ -41,7 +41,6 @@ class DynamicSlotInfo(BaseModel):
                 display_name = name.replace("_", " ").title()
                 parts.append(f"{display_name}: {value}")
         return "\n".join(parts) if parts else "No specific details provided yet."
-
 
 
 class RetrievalResult(BaseModel):

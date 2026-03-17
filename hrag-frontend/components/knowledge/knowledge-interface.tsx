@@ -48,20 +48,20 @@ export function KnowledgeInterface({ addToast }: KnowledgeInterfaceProps) {
       try {
         const tasksData = await apiClient.getGardenerTasks();
         const mappedTasks: GardenerTask[] = tasksData.tasks.map((t: ApiGardenerTask) => ({
-          id: parseInt(t.id) || Date.now(),
+          id: String(t.id),
           type: t.type,
-          entityName: t.entity_name,
+          entity_name: t.entity_name,
           source: t.source,
           confidence: t.confidence,
-          existingEntity: t.existing_entity ? {
+          existing_entity: t.existing_entity ? {
             name: t.existing_entity.name,
-            desc: t.existing_entity.description
+            description: t.existing_entity.description
           } : undefined,
-          newEntity: t.new_entity ? {
+          new_entity: t.new_entity ? {
             name: t.new_entity.name,
-            desc: t.new_entity.description
+            description: t.new_entity.description
           } : undefined,
-          desc: t.description
+          description: t.description
         }));
         setTasks(mappedTasks);
       } catch (error) {
@@ -73,9 +73,9 @@ export function KnowledgeInterface({ addToast }: KnowledgeInterfaceProps) {
     }
   };
 
-  const handleResolve = async (id: number, action: 'approve' | 'reject') => {
+  const handleResolve = async (id: string, action: 'approve' | 'reject') => {
     try {
-      await apiClient.gardenerAction(id.toString(), action);
+      await apiClient.gardenerAction(id, action);
       setTasks(prev => prev.filter(t => t.id !== id));
       
       if (action === 'approve') {
@@ -86,6 +86,35 @@ export function KnowledgeInterface({ addToast }: KnowledgeInterfaceProps) {
     } catch (error) {
       console.error('Action error:', error);
       addToast(`Failed to ${action} entity. Backend service unavailable.`, 'error');
+    }
+  };
+
+  const handleBulkResolve = async (action: 'approve' | 'reject') => {
+    if (tasks.length === 0) return;
+    
+    setIsLoading(true);
+    let successCount = 0;
+    
+    try {
+      // Execute serially to prevent backend overload
+      for (const task of tasks) {
+        try {
+          await apiClient.gardenerAction(task.id.toString(), action);
+          successCount++;
+        } catch (e) {
+          console.error(`Failed to ${action} task ${task.id}:`, e);
+        }
+      }
+      
+      if (successCount === tasks.length) {
+        addToast(`Successfully ${action}d all ${successCount} entities.`, 'success');
+        setTasks([]);
+      } else {
+        addToast(`Processed ${successCount}/${tasks.length} entities. Some failed.`, 'error');
+        await loadData(); // Reload to get remaining tasks
+      }
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -179,16 +208,36 @@ export function KnowledgeInterface({ addToast }: KnowledgeInterfaceProps) {
             The Gardener Review 
             <span className="text-xs font-normal text-slate-500 bg-slate-900 px-2 py-1 rounded border border-slate-800">Human-in-the-Loop</span>
           </h3>
-          <button 
-            onClick={() => {
-              loadData();
-              addToast('Queue refreshed.', 'info');
-            }} 
-            className="text-xs text-blue-400 hover:text-blue-300 flex items-center gap-1 transition-colors"
-            disabled={isLoading}
-          >
-            <RefreshCw className={`w-3 h-3 ${isLoading ? 'animate-spin' : ''}`} /> Refresh Queue
-          </button>
+          <div className="flex items-center gap-3">
+            {tasks.length > 1 && (
+              <div className="flex items-center gap-2 mr-2">
+                 <button
+                    onClick={() => handleBulkResolve('approve')}
+                    disabled={isLoading}
+                    className="text-xs bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 px-3 py-1.5 rounded-md border border-emerald-500/20 transition-colors disabled:opacity-50"
+                 >
+                   Approve All
+                 </button>
+                 <button
+                    onClick={() => handleBulkResolve('reject')}
+                    disabled={isLoading}
+                    className="text-xs bg-red-500/10 text-red-400 hover:bg-red-500/20 px-3 py-1.5 rounded-md border border-red-500/20 transition-colors disabled:opacity-50"
+                 >
+                   Reject All
+                 </button>
+              </div>
+            )}
+            <button 
+              onClick={() => {
+                loadData();
+                addToast('Queue refreshed.', 'info');
+              }} 
+              className="text-xs text-blue-400 hover:text-blue-300 flex items-center gap-1 transition-colors"
+              disabled={isLoading}
+            >
+              <RefreshCw className={`w-3 h-3 ${isLoading ? 'animate-spin' : ''}`} /> Refresh
+            </button>
+          </div>
         </div>
 
         {isLoading ? (

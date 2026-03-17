@@ -8,14 +8,13 @@ from neo4j.time import Date, DateTime, Duration, Time
 
 import httpx
 from app.core.config import settings
+from app.core.db import get_neo4j_driver, get_qdrant_client
 from app.core.logger import logger
 from app.core.utils import sanitize_cypher
 from app.llm_factory import get_embedding, get_llm
 from app.skill_registry import SkillRegistry, get_active_skill
-from app.state import DynamicSlotInfo, GraphState, RetrievalResult
+from app.state import DynamicSlotInfo, GraphState, RetrievalResult, SlotInfo
 from langchain_core.prompts import ChatPromptTemplate
-from neo4j import AsyncGraphDatabase
-from qdrant_client import QdrantClient
 from qdrant_client.models import FieldCondition, Filter, MatchText
 
 
@@ -94,46 +93,7 @@ Output: Raw Cypher query only. No markdown. No explanation.
     return cypher
 
 
-class Neo4jClient:
-    _driver = None
-
-    @classmethod
-    async def get_driver(cls):
-        if cls._driver is None:
-            try:
-                cls._driver = AsyncGraphDatabase.driver(
-                    settings.neo4j_uri,
-                    auth=(settings.neo4j_user, settings.neo4j_password),
-                )
-                async with cls._driver.session() as session:
-                    await session.run("RETURN 1")
-            except Exception as e:
-                cls._driver = None
-                return None
-        return cls._driver
-
-    @classmethod
-    async def close(cls):
-        if cls._driver:
-            await cls._driver.close()
-            cls._driver = None
-
-
-class QdrantClientWrapper:
-    _client: Optional[QdrantClient] = None
-
-    @classmethod
-    def get_client(cls) -> Optional[QdrantClient]:
-        if cls._client is None:
-            try:
-                cls._client = QdrantClient(
-                    host=settings.qdrant_host, port=settings.qdrant_port
-                )
-                cls._client.get_collections()
-            except Exception as e:
-                cls._client = None
-                return None
-        return cls._client
+# Neo4jClient and QdrantClientWrapper replaced by app.core.db
 
 
 async def graph_search_node(state: GraphState) -> GraphState:
@@ -152,10 +112,10 @@ async def graph_search_node(state: GraphState) -> GraphState:
     results: List[RetrievalResult] = []
 
     try:
-        driver = await Neo4jClient.get_driver()
+        driver = get_neo4j_driver()
 
         if driver:
-            async with driver.session() as session:
+            with driver.session() as session:
                 params = {"hint": query}
                 params.update(slots.get_filled_slots())
 
@@ -181,8 +141,8 @@ async def graph_search_node(state: GraphState) -> GraphState:
                 if not cypher:
                     return {**state, "graph_results": []}
 
-                result = await session.run(cypher, **params)
-                records = await result.data()
+                result = session.run(cypher, **params)
+                records = result.data()
 
                 for record in records:
                     title_candidates = ["subject", "name", "title", "id", "event_id"]
@@ -251,7 +211,7 @@ async def vector_search_node(state: GraphState) -> GraphState:
     results: List[RetrievalResult] = []
 
     try:
-        client = QdrantClientWrapper.get_client()
+        client = get_qdrant_client()
 
         if client:
             collections = client.get_collections()

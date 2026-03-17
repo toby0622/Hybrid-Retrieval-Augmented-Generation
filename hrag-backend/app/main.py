@@ -1,10 +1,13 @@
 from contextlib import asynccontextmanager
+import os
+
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
+from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.routers import chat, documents, health
 from app.core.config import settings
 from app.core.logger import logger
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
 
 
 @asynccontextmanager
@@ -22,13 +25,10 @@ async def lifespan(app: FastAPI):
     # Shutdown — cleanup all connections
     logger.info("Shutting down, cleaning up resources...")
     try:
-        from app.api.routers.documents import close_document_clients
+        from app.core.db import close_db_clients
         from app.llm_factory import close_embedding_client
-        from app.nodes.retrieval import Neo4jClient, QdrantClientWrapper
 
-        await Neo4jClient.close()
-        QdrantClientWrapper._client = None
-        close_document_clients()
+        close_db_clients()
         await close_embedding_client()
         logger.info("All resources cleaned up.")
     except Exception as e:
@@ -41,6 +41,27 @@ app = FastAPI(
     version="0.3.0",
     lifespan=lifespan,
 )
+
+# Optional basic API key for sensitive endpoints
+API_KEY = os.getenv("API_KEY", "hrag-dev-key")
+
+
+@app.middleware("http")
+async def api_key_middleware(request: Request, call_next):
+    # Allow health check and OPTIONS requests
+    if request.url.path == "/api/health" or request.method == "OPTIONS":
+        return await call_next(request)
+
+    # Protect these endpoints
+    protected_prefixes = ["/upload", "/api/ingest", "/nodes", "/documents", "/gardener"]
+    is_protected = any(request.url.path.startswith(prefix) for prefix in protected_prefixes)
+    
+    if is_protected:
+        auth_header = request.headers.get("Authorization")
+        if not auth_header or auth_header != f"Bearer {API_KEY}":
+            return JSONResponse(status_code=401, content={"detail": "Unauthorized / Invalid API Key"})
+
+    return await call_next(request)
 
 app.add_middleware(
     CORSMiddleware,

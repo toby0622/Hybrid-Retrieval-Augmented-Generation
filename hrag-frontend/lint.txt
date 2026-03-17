@@ -1,0 +1,44 @@
+
+> hrag-frontend@0.1.0 lint
+> eslint
+
+
+C:\Users\TOBY\Documents\GitHub\Hybrid-Retrieval-Augmented-Generation\hrag-frontend\components\copilot\chat-interface.tsx
+   4:15  warning  'Database' is defined but never used             @typescript-eslint/no-unused-vars
+  31:10  warning  'healthInfo' is assigned a value but never used  @typescript-eslint/no-unused-vars
+  57:16  warning  'error' is defined but never used                @typescript-eslint/no-unused-vars
+
+C:\Users\TOBY\Documents\GitHub\Hybrid-Retrieval-Augmented-Generation\hrag-frontend\components\copilot\diagnostic-card.tsx
+  101:58  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  103:59  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\Users\TOBY\Documents\GitHub\Hybrid-Retrieval-Augmented-Generation\hrag-frontend\components\copilot\dynamic-reasoning.tsx
+  17:7   error    Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+C:\Users\TOBY\Documents\GitHub\Hybrid-Retrieval-Augmented-Generation\hrag-frontend\components\copilot\dynamic-reasoning.tsx:17:7
+  15 |   useEffect(() => {
+  16 |     if (isStreaming) {
+> 17 |       setDisplayedSteps(steps);
+     |       ^^^^^^^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  18 |     } else {
+  19 |       setDisplayedSteps([]);
+  20 |       steps.forEach((step, index) => {  react-hooks/set-state-in-effect
+  40:17  warning  'isPending' is assigned a value but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               @typescript-eslint/no-unused-vars
+
+C:\Users\TOBY\Documents\GitHub\Hybrid-Retrieval-Augmented-Generation\hrag-frontend\components\knowledge\document-browser.tsx
+  16:10  warning  'offset' is assigned a value but never used                                                                                           @typescript-eslint/no-unused-vars
+  16:18  warning  'setOffset' is assigned a value but never used                                                                                        @typescript-eslint/no-unused-vars
+  43:6   warning  React Hook useEffect has missing dependencies: 'loadDocuments' and 'searchQuery'. Either include them or remove the dependency array  react-hooks/exhaustive-deps
+
+C:\Users\TOBY\Documents\GitHub\Hybrid-Retrieval-Augmented-Generation\hrag-frontend\components\knowledge\node-browser.tsx
+  58:6   warning  React Hook useEffect has missing dependencies: 'loadGraphData', 'loadNodes', and 'searchQuery'. Either include them or remove the dependency array  react-hooks/exhaustive-deps
+  79:14  warning  'e' is defined but never used                                                                                                                       @typescript-eslint/no-unused-vars
+
+✖ 12 problems (3 errors, 9 warnings)
+

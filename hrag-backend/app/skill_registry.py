@@ -8,7 +8,7 @@ registry that manages all skills from the `skills/` directory.
 import importlib.util
 import inspect
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Type
+from typing import Any, Dict, List, Optional
 
 from app.core.config import settings
 from app.core.logger import logger

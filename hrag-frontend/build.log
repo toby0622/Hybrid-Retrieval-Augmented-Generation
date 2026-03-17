@@ -1,0 +1,24 @@
+
+> hrag-frontend@0.1.0 build
+> next build
+
+▲ Next.js 16.1.6 (Turbopack)
+- Environments: .env.local
+
+  Creating an optimized production build ...
+✓ Compiled successfully in 1151.3ms
+  Running TypeScript ...
+Failed to compile.
+
+./components/knowledge/knowledge-interface.tsx:50:15
+Type error: Type '{ id: number; type: "conflict" | "new"; entityName: string; source: string; confidence: number; existingEntity: { name: string; desc: string; } | undefined; newEntity: { name: string; desc: string; } | undefined; desc: string | undefined; }[]' is not assignable to type 'GardenerTask[]'.
+  Property 'entity_name' is missing in type '{ id: number; type: "conflict" | "new"; entityName: string; source: string; confidence: number; existingEntity: { name: string; desc: string; } | undefined; newEntity: { name: string; desc: string; } | undefined; desc: string | undefined; }' but required in type 'GardenerTask'.
+
+[0m [90m 48 |[39m       [36mtry[39m {
+ [90m 49 |[39m         [36mconst[39m tasksData [33m=[39m [36mawait[39m apiClient[33m.[39mgetGardenerTasks()[33m;[39m
+[31m[1m>[22m[39m[90m 50 |[39m         [36mconst[39m mappedTasks[33m:[39m [33mGardenerTask[39m[] [33m=[39m tasksData[33m.[39mtasks[33m.[39mmap((t[33m:[39m [33mApiGardenerTask[39m) [33m=>[39m ({
+ [90m    |[39m               [31m[1m^[22m[39m
+ [90m 51 |[39m           id[33m:[39m parseInt(t[33m.[39mid) [33m||[39m [33mDate[39m[33m.[39mnow()[33m,[39m
+ [90m 52 |[39m           type[33m:[39m t[33m.[39mtype[33m,[39m
+ [90m 53 |[39m           entityName[33m:[39m t[33m.[39mentity_name[33m,[39m[0m
+Next.js build worker exited with code: 1 and signal: null

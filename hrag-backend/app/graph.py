@@ -11,7 +11,7 @@ from app.nodes.response import (
 from app.nodes.retrieval import hybrid_retrieval_node
 from app.nodes.slot_filling import route_after_slot_check, slot_check_node
 from app.state import GraphState
-from langgraph.checkpoint.memory import MemorySaver
+from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 from langgraph.graph import END, StateGraph
 
 
@@ -69,24 +69,24 @@ def create_hrag_graph() -> StateGraph:
     return workflow
 
 
-def compile_graph(with_checkpointer: bool = True):
+async def compile_graph(with_checkpointer: bool = True):
     workflow = create_hrag_graph()
 
     if with_checkpointer:
-        checkpointer = MemorySaver()
+        checkpointer = AsyncSqliteSaver.from_conn_string("checkpoints.db")
+        await checkpointer.setup()
         return workflow.compile(checkpointer=checkpointer)
 
     return workflow.compile()
 
-
 _graph = None
 
 
-def _get_graph():
+async def _get_graph():
     """Lazy initialization of the compiled graph."""
     global _graph
     if _graph is None:
-        _graph = compile_graph(with_checkpointer=True)
+        _graph = await compile_graph(with_checkpointer=True)
     return _graph
 
 
@@ -96,8 +96,9 @@ async def run_query(
     config = {"configurable": {"thread_id": thread_id}}
 
     existing_state = None
+    graph = await _get_graph()
     try:
-        state_snapshot = _get_graph().get_state(config)
+        state_snapshot = await graph.aget_state(config)
         if state_snapshot and state_snapshot.values:
             existing_state = state_snapshot.values
     except Exception as e:
@@ -131,6 +132,7 @@ async def run_query(
     if feedback:
         initial_state["feedback"] = feedback
 
-    result = await _get_graph().ainvoke(initial_state, config)
+    graph = await _get_graph()
+    result = await graph.ainvoke(initial_state, config)
 
     return result

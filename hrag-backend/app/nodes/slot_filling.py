@@ -86,9 +86,7 @@ MAX_CLARIFICATION_ROUNDS = 3
 
 async def slot_check_node(state: GraphState) -> GraphState:
     slots = state.get("slots")
-    if isinstance(slots, SlotInfo):
-        slots = slots.to_dynamic()
-    elif slots is None:
+    if slots is None:
         slots = DynamicSlotInfo()
 
     query = state.get("query", "")

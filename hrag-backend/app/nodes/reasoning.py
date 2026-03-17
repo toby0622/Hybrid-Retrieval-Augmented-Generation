@@ -11,7 +11,6 @@ from app.state import (
     DynamicSlotInfo,
     GraphState,
     RetrievalResult,
-    RetrievalResult,
 )
 from langchain_core.prompts import ChatPromptTemplate
 
@@ -39,7 +38,7 @@ Respond in {skill_config.response_language}.
   <vector_search_results>
     {{vector_context}}
   </vector_search_results>
-  
+
   <skill_results>
     {{skill_context}}
   </skill_results>
@@ -71,7 +70,7 @@ Structure your response as follows:
   <thinking>
     [Your step-by-step reasoning]
   </thinking>
-  
+
   <diagnosis>
     <root_cause confidence="High|Medium|Low">
       [Main conclusion or root cause]
@@ -83,7 +82,7 @@ Structure your response as follows:
       [Impact or scope of the findings]
     </impact>
   </diagnosis>
-  
+
   <recommendations>
     <action priority="1">
       [Primary recommendation]
@@ -156,7 +155,6 @@ async def reasoning_node(state: GraphState) -> GraphState:
     except Exception as e:
         logger.error(f"Reasoning analysis failed: {e}")
         llm_analysis = f"Analysis error: {e}"
-
 
     diagnostic = _parse_diagnostic_response(
         llm_analysis,
@@ -271,7 +269,7 @@ def _parse_diagnostic_response(
     if skill_results:
         table_data = []
         for r in skill_results:
-             table_data.append(
+            table_data.append(
                 {"title": r.get("title"), "content": r.get("content")}
             )
 
@@ -280,7 +278,7 @@ def _parse_diagnostic_response(
                 id="skill",
                 source="Skill Tool",
                 title=f"Skill Execution ({len(skill_results)} results)",
-                detail=f"Executed Skills provided data.",
+                detail="Executed Skills provided data.",
                 status="info",
                 is_parallel=True,
                 raw_content={
